@@ -1,6 +1,6 @@
 import { Logo } from "@/react-app/components/Logo";
 
-export function TypingIndicator() {
+export function TypingIndicator({ message = "LAI is thinking..." }: { message?: string }) {
   return (
     <div className="flex gap-4 py-6">
       {/* Logo replaces Bot (lucide) */}
@@ -23,7 +23,7 @@ export function TypingIndicator() {
           />
         </div>
         <span className="text-sm text-muted-foreground ml-2">
-          LAI is thinking...
+          {message}
         </span>
       </div>
     </div>

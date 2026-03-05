@@ -27,18 +27,47 @@ export interface RAGResponse {
     prompt: number;
     completion: number;
   };
+  session_id: string;
 }
 
-export async function queryRAG(question: string): Promise<RAGResponse> {
+export interface UploadResponse {
+  session_id: string;
+  filename: string;
+  pages: number;
+  chunks: number;
+  message: string;
+}
+
+export async function queryRAG(question: string, sessionId: string | null = null): Promise<RAGResponse> {
   const res = await fetch(`${BACKEND_URL}/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, session_id: sessionId }),
   });
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error(error.detail || `Server error: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export async function uploadDocument(file: File, sessionId: string | null = null): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (sessionId) {
+    formData.append("session_id", sessionId);
+  }
+
+  const res = await fetch(`${BACKEND_URL}/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.detail || `Upload failed: ${res.status}`);
   }
 
   return res.json();

@@ -21,6 +21,7 @@ export interface ChatAttachment {
   name: string;
   size: number;
   type: string;
+  file?: File;
 }
 
 export interface ChatMessageData {

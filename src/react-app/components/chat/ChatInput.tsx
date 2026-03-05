@@ -82,6 +82,7 @@ export function ChatInput({
       name: file.name,
       size: file.size,
       type: file.type,
+      file,
     }));
     setAttachments((prev) => [...prev, ...newAttachments]);
     e.currentTarget.value = "";
@@ -110,6 +111,7 @@ export function ChatInput({
       name: file.name,
       size: file.size,
       type: file.type,
+      file,
     }));
     setAttachments((prev) => [...prev, ...newAttachments]);
   };
