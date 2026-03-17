@@ -1,4 +1,6 @@
-import { useState } from "react";
+"use client";
+
+import { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -7,25 +9,34 @@ import {
 } from "@/react-app/components/ui/card";
 import { Button } from "@/react-app/components/ui/button";
 import { Input } from "@/react-app/components/ui/input";
+import { Progress } from "@/react-app/components/ui/progress";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/react-app/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/react-app/components/ui/dropdown-menu";
-import { Progress } from "@/react-app/components/ui/progress";
+import { cn } from "@/react-app/lib/utils";
 import {
   SignalTowerIcon,
   CheckRingIcon,
   AlertIcon,
   DangerRingIcon,
-  TrendUpIcon,
   FilterIcon,
   SearchIcon,
   ArrowUpRightIcon,
   ArrowDownRightIcon,
   SandglassIcon,
+  DownloadIcon,
 } from "@/react-app/components/icons";
+import ReportDownloadPanel from "@/react-app/components/ReportDownloadPanel";
+import type { DocumentItem } from "@/react-app/components/ReportDownloadPanel";
 
 interface RiskArea {
   id: string;
@@ -39,347 +50,443 @@ interface RiskArea {
   lastUpdated: string;
 }
 
+const riskCfg = {
+  low: {
+    color: "text-emerald-600 dark:text-emerald-500",
+    bg: "bg-emerald-500/10 dark:bg-emerald-500/20",
+    border: "border-emerald-500/20",
+    borderL: "border-l-emerald-500/50",
+    Icon: CheckRingIcon,
+    label: "Low Risk",
+    bgI: "bg-emerald-500/20",
+  },
+  medium: {
+    color: "text-amber-600 dark:text-amber-500",
+    bg: "bg-amber-500/10 dark:bg-amber-500/20",
+    border: "border-amber-500/20",
+    borderL: "border-l-amber-500/50",
+    Icon: AlertIcon,
+    label: "Medium Risk",
+    bgI: "bg-amber-500/20",
+  },
+  high: {
+    color: "text-rose-600 dark:text-rose-500",
+    bg: "bg-rose-500/10 dark:bg-rose-500/20",
+    border: "border-rose-500/20",
+    borderL: "border-l-rose-500/50",
+    Icon: DangerRingIcon,
+    label: "High Risk",
+    bgI: "bg-rose-500/20",
+  },
+};
+
+const DOCUMENTS: DocumentItem[] = [
+  {
+    id: "1",
+    name: "permit_application_2024.pdf",
+    size: 2.4,
+    uploadDate: "2024-02-18",
+    type: "PDF",
+    status: "analyzed",
+    category: "Permits",
+  },
+  {
+    id: "2",
+    name: "land_lease_agreement.docx",
+    size: 1.1,
+    uploadDate: "2024-02-15",
+    type: "Word",
+    status: "analyzed",
+    category: "Legal",
+  },
+  {
+    id: "3",
+    name: "environmental_impact_report.pdf",
+    size: 5.8,
+    uploadDate: "2024-02-14",
+    type: "PDF",
+    status: "analyzed",
+    category: "Environmental",
+  },
+  {
+    id: "4",
+    name: "technical_specifications.xlsx",
+    size: 0.8,
+    uploadDate: "2024-02-10",
+    type: "Excel",
+    status: "pending",
+    category: "Technical",
+  },
+  {
+    id: "5",
+    name: "grid_connection_procedure.pdf",
+    size: 3.2,
+    uploadDate: "2024-02-08",
+    type: "PDF",
+    status: "archived",
+    category: "Grid",
+  },
+];
+
+const RISKS: RiskArea[] = [
+  {
+    id: "1",
+    name: "Environmental Compliance",
+    category: "Legal",
+    riskLevel: "low",
+    score: 85,
+    trend: "up",
+    description: "All environmental regulations compliant",
+    flaggedItems: 0,
+    lastUpdated: "2024-02-18",
+  },
+  {
+    id: "2",
+    name: "Land Lease Agreements",
+    category: "Contracts",
+    riskLevel: "medium",
+    score: 65,
+    trend: "down",
+    description: "Potential liability in clause 4.2 regarding termination",
+    flaggedItems: 2,
+    lastUpdated: "2024-02-16",
+  },
+  {
+    id: "3",
+    name: "Grid Connection Rights",
+    category: "Technical",
+    riskLevel: "high",
+    score: 35,
+    trend: "down",
+    description: "Restricted grid access periods during maintenance windows",
+    flaggedItems: 5,
+    lastUpdated: "2024-02-15",
+  },
+  {
+    id: "4",
+    name: "Financing & Loans",
+    category: "Financial",
+    riskLevel: "low",
+    score: 92,
+    trend: "stable",
+    description: "Favorable loan terms secured",
+    flaggedItems: 0,
+    lastUpdated: "2024-02-18",
+  },
+  {
+    id: "5",
+    name: "Permits & Licenses",
+    category: "Regulatory",
+    riskLevel: "medium",
+    score: 72,
+    trend: "up",
+    description: "Operating permit expires in 18 months",
+    flaggedItems: 1,
+    lastUpdated: "2024-02-14",
+  },
+  {
+    id: "6",
+    name: "Insurance Coverage",
+    category: "Insurance",
+    riskLevel: "low",
+    score: 88,
+    trend: "up",
+    description: "Comprehensive coverage in place",
+    flaggedItems: 0,
+    lastUpdated: "2024-02-17",
+  },
+];
+
 export default function DashboardRiskPage() {
-  const [riskAreas] = useState<RiskArea[]>([
-    {
-      id: "1",
-      name: "Environmental Compliance",
-      category: "Legal",
-      riskLevel: "low",
-      score: 85,
-      trend: "up",
-      description: "All environmental regulations compliant",
-      flaggedItems: 0,
-      lastUpdated: "2024-02-18",
-    },
-    {
-      id: "2",
-      name: "Land Lease Agreements",
-      category: "Contracts",
-      riskLevel: "medium",
-      score: 65,
-      trend: "down",
-      description: "Potential liability in clause 4.2 regarding termination",
-      flaggedItems: 2,
-      lastUpdated: "2024-02-16",
-    },
-    {
-      id: "3",
-      name: "Grid Connection Rights",
-      category: "Technical",
-      riskLevel: "high",
-      score: 35,
-      trend: "down",
-      description: "Restricted grid access periods during maintenance windows",
-      flaggedItems: 5,
-      lastUpdated: "2024-02-15",
-    },
-    {
-      id: "4",
-      name: "Financing & Loans",
-      category: "Financial",
-      riskLevel: "low",
-      score: 92,
-      trend: "stable",
-      description: "Favorable loan terms secured",
-      flaggedItems: 0,
-      lastUpdated: "2024-02-18",
-    },
-    {
-      id: "5",
-      name: "Permits & Licenses",
-      category: "Regulatory",
-      riskLevel: "medium",
-      score: 72,
-      trend: "up",
-      description: "Operating permit expires in 18 months",
-      flaggedItems: 1,
-      lastUpdated: "2024-02-14",
-    },
-    {
-      id: "6",
-      name: "Insurance Coverage",
-      category: "Insurance",
-      riskLevel: "low",
-      score: 88,
-      trend: "up",
-      description: "Comprehensive coverage in place",
-      flaggedItems: 0,
-      lastUpdated: "2024-02-17",
-    },
-  ]);
+  const [tab, setTab] = useState<"assessment" | "reports">("assessment");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<string | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterRisk, setFilterRisk] = useState<string | null>(null);
+  const filtered = useMemo(
+    () =>
+      RISKS.filter((r) => {
+        const ms =
+          r.name.toLowerCase().includes(search.toLowerCase()) ||
+          r.category.toLowerCase().includes(search.toLowerCase());
+        return ms && (!filter || r.riskLevel === filter);
+      }),
+    [search, filter],
+  );
 
-  const filteredRisks = riskAreas.filter((r) => {
-    const matchesSearch =
-      r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = !filterRisk || r.riskLevel === filterRisk;
-    return matchesSearch && matchesFilter;
-  });
-
-  const riskStats = {
-    low: riskAreas.filter((r) => r.riskLevel === "low").length,
-    medium: riskAreas.filter((r) => r.riskLevel === "medium").length,
-    high: riskAreas.filter((r) => r.riskLevel === "high").length,
+  const stats = {
+    low: RISKS.filter((r) => r.riskLevel === "low").length,
+    medium: RISKS.filter((r) => r.riskLevel === "medium").length,
+    high: RISKS.filter((r) => r.riskLevel === "high").length,
   };
-  const averageScore =
-    Math.round(riskAreas.reduce((s, r) => s + r.score, 0) / riskAreas.length) ||
-    0;
-
-  const riskConfig = {
-    low: {
-      color: "text-emerald-600 dark:text-emerald-500",
-      bg: "bg-emerald-500/10 dark:bg-emerald-500/20",
-      border: "border-emerald-500/20",
-      Icon: CheckRingIcon,
-      label: "Low Risk",
-      bgIntense: "bg-emerald-500/20",
-    },
-    medium: {
-      color: "text-amber-600 dark:text-amber-500",
-      bg: "bg-amber-500/10 dark:bg-amber-500/20",
-      border: "border-amber-500/20",
-      Icon: AlertIcon,
-      label: "Medium Risk",
-      bgIntense: "bg-amber-500/20",
-    },
-    high: {
-      color: "text-rose-600 dark:text-rose-500",
-      bg: "bg-rose-500/10 dark:bg-rose-500/20",
-      border: "border-rose-500/20",
-      Icon: DangerRingIcon,
-      label: "High Risk",
-      bgIntense: "bg-rose-500/20",
-    },
-  };
+  const avg = Math.round(RISKS.reduce((s, r) => s + r.score, 0) / RISKS.length);
+  const analyzedCount = DOCUMENTS.filter((d) => d.status === "analyzed").length;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Risk Assessment</h1>
-          <p className="text-muted-foreground">
-            Traffic light visualization of project risks across all areas
-          </p>
-        </div>
-        <Button variant="outline" size="sm">
-          <TrendUpIcon className="w-4 h-4 mr-2" />
-          Download Report
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold">Risk Assessment</h1>
+        <p className="text-muted-foreground">
+          Traffic light risk visualization and DDiQ report generation
+        </p>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-card/50 backdrop-blur border-border/50">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Overall Score</p>
-                <p className="text-2xl font-bold mt-2">{averageScore}%</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Health Rating
-                </p>
-              </div>
-              <div className="p-2.5 rounded-md bg-slate-100 dark:bg-slate-800">
-                <SignalTowerIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="assessment" className="flex items-center gap-2">
+            <SignalTowerIcon className="w-4 h-4" />
+            Risk Assessment
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-2">
+            <DownloadIcon className="w-4 h-4" />
+            DDiQ Reports
+            {analyzedCount > 0 && (
+              <span className="text-[10px] font-medium ml-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                {analyzedCount}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-        {(["low", "medium", "high"] as const).map((level) => {
-          const cfg = riskConfig[level];
-          return (
-            <Card
-              key={level}
-              className={`bg-card/50 backdrop-blur border-border/50 border-l-4 border-l-${level === "low" ? "emerald" : level === "medium" ? "amber" : "rose"}-500/50`}
-            >
+        <TabsContent value="assessment" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="bg-card/50 backdrop-blur border-border/50">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">{cfg.label}</p>
-                    <p className={`text-2xl font-bold mt-2 ${cfg.color}`}>
-                      {riskStats[level]}
+                    <p className="text-sm text-muted-foreground">
+                      Overall Score
+                    </p>
+                    <p className="text-2xl font-bold mt-2">{avg}%</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Health Rating
                     </p>
                   </div>
-                  <div className={`p-2.5 rounded-md ${cfg.bg}`}>
-                    <cfg.Icon className={`w-5 h-5 ${cfg.color}`} />
+                  <div className="p-2.5 rounded-md bg-slate-100 dark:bg-slate-800">
+                    <SignalTowerIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                   </div>
                 </div>
               </CardContent>
             </Card>
-          );
-        })}
-      </div>
-
-      {/* Traffic Light Visualization */}
-      <Card className="bg-card/50 backdrop-blur border-border/50 overflow-hidden">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-semibold">
-            Risk Distribution
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {(["low", "medium", "high"] as const).map((level) => {
-              const cfg = riskConfig[level];
+            {(["low", "medium", "high"] as const).map((lv) => {
+              const c = riskCfg[lv];
               return (
-                <div key={level} className="text-center">
-                  <div className="flex justify-center mb-4">
-                    <div
-                      className={`relative w-24 h-24 rounded-md ${cfg.bgIntense} border-4 border-${level === "low" ? "emerald" : level === "medium" ? "amber" : "rose"}-500/30 flex items-center justify-center animate-pulse`}
-                    >
-                      <cfg.Icon className={`w-12 h-12 ${cfg.color}`} />
+                <Card
+                  key={lv}
+                  className={cn(
+                    "bg-card/50 backdrop-blur border-border/50 border-l-4",
+                    c.borderL,
+                  )}
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          {c.label}
+                        </p>
+                        <p className={cn("text-2xl font-bold mt-2", c.color)}>
+                          {stats[lv]}
+                        </p>
+                      </div>
+                      <div className={cn("p-2.5 rounded-md", c.bg)}>
+                        <c.Icon className={cn("w-5 h-5", c.color)} />
+                      </div>
                     </div>
-                  </div>
-                  <h3 className={`font-semibold mb-2 ${cfg.color}`}>
-                    {cfg.label}
-                  </h3>
-                  <p className={`text-3xl font-bold mb-1 ${cfg.color}`}>
-                    {riskStats[level]}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Areas</p>
-                  <p className={`text-xs mt-2 ${cfg.color}`}>
-                    {Math.round((riskStats[level] / riskAreas.length) * 100)}%
-                    of total
-                  </p>
-                </div>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Search & Filter */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
-          <SearchIcon className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search risk areas..."
-            className="pl-10"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <FilterIcon className="w-4 h-4 mr-2" />
-              Risk Level
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setFilterRisk(null)}>
-              All Levels
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setFilterRisk("low")}>
-              Low Risk
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setFilterRisk("medium")}>
-              Medium Risk
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setFilterRisk("high")}>
-              High Risk
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Risk List */}
-      <Card className="bg-card/50 backdrop-blur border-border/50">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-semibold">
-            Risk Areas ({filteredRisks.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {filteredRisks.length === 0 ? (
-            <div className="text-center py-8">
-              <SignalTowerIcon className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-              <p className="text-muted-foreground">No risk areas found</p>
-            </div>
-          ) : (
-            filteredRisks.map((risk) => {
-              const config = riskConfig[risk.riskLevel];
-              return (
-                <div
-                  key={risk.id}
-                  className={`p-4 rounded-md border transition-colors ${config.border} ${config.bgIntense} hover:opacity-80`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div
-                        className={`p-2.5 rounded-lg flex-shrink-0 ${config.bg}`}
-                      >
-                        <config.Icon className={`w-5 h-5 ${config.color}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-semibold">{risk.name}</h4>
-                          <span
-                            className={`text-xs font-medium px-2.5 py-1 rounded-md ${config.bg} ${config.color}`}
-                          >
-                            {config.label}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {risk.description}
-                        </p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">
-                            {risk.category}
-                          </span>
-                          {risk.flaggedItems > 0 && (
-                            <span className="flex items-center gap-1 text-rose-600 dark:text-rose-500">
-                              <AlertIcon className="w-3 h-3" />
-                              {risk.flaggedItems} flagged item
-                              {risk.flaggedItems !== 1 ? "s" : ""}
-                            </span>
+          <Card className="bg-card/50 backdrop-blur border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold">
+                Risk Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {(["low", "medium", "high"] as const).map((lv) => {
+                  const c = riskCfg[lv];
+                  return (
+                    <div key={lv} className="text-center">
+                      <div className="flex justify-center mb-4">
+                        <div
+                          className={cn(
+                            "w-24 h-24 rounded-md border-4 flex items-center justify-center",
+                            c.bgI,
+                            c.border,
                           )}
-                          <span className="flex items-center gap-1">
-                            <SandglassIcon className="w-3 h-3" />
-                            Updated {risk.lastUpdated}
-                          </span>
+                        >
+                          <c.Icon className={cn("w-12 h-12", c.color)} />
                         </div>
                       </div>
+                      <h3 className={cn("font-semibold mb-2", c.color)}>
+                        {c.label}
+                      </h3>
+                      <p className={cn("text-3xl font-bold mb-1", c.color)}>
+                        {stats[lv]}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Areas</p>
+                      <p className={cn("text-xs mt-2", c.color)}>
+                        {Math.round((stats[lv] / RISKS.length) * 100)}%
+                      </p>
                     </div>
-                    <div className="text-right flex-shrink-0 ml-4">
-                      <p className="text-2xl font-bold">{risk.score}%</p>
-                      <div className="flex items-center gap-1 mt-1 justify-end">
-                        {risk.trend === "up" ? (
-                          <ArrowUpRightIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
-                        ) : risk.trend === "down" ? (
-                          <ArrowDownRightIcon className="w-4 h-4 text-rose-600 dark:text-rose-500" />
-                        ) : (
-                          <div className="w-4 h-0.5 bg-muted-foreground" />
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          {risk.trend.charAt(0).toUpperCase() +
-                            risk.trend.slice(1)}
-                        </span>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <SearchIcon className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search risk areas..."
+                className="pl-10"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <FilterIcon className="w-4 h-4 mr-2" />
+                  {filter
+                    ? riskCfg[filter as keyof typeof riskCfg]?.label
+                    : "All Levels"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setFilter(null)}>
+                  All Levels
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilter("low")}>
+                  Low Risk
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilter("medium")}>
+                  Medium Risk
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilter("high")}>
+                  High Risk
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTab("reports")}
+            >
+              <DownloadIcon className="w-4 h-4 mr-2" />
+              DDiQ Report
+            </Button>
+          </div>
+
+          <Card className="bg-card/50 backdrop-blur border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold">
+                Risk Areas ({filtered.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {filtered.length === 0 ? (
+                <div className="text-center py-8">
+                  <SignalTowerIcon className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                  <p className="text-muted-foreground">No risk areas found</p>
+                </div>
+              ) : (
+                filtered.map((r) => {
+                  const c = riskCfg[r.riskLevel];
+                  return (
+                    <div
+                      key={r.id}
+                      className={cn(
+                        "p-4 rounded-md border transition-colors hover:opacity-90",
+                        c.border,
+                        c.bgI,
+                      )}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div
+                            className={cn(
+                              "p-2.5 rounded-lg flex-shrink-0",
+                              c.bg,
+                            )}
+                          >
+                            <c.Icon className={cn("w-5 h-5", c.color)} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-semibold">{r.name}</h4>
+                              <span
+                                className={cn(
+                                  "text-xs font-medium px-2.5 py-1 rounded-md",
+                                  c.bg,
+                                  c.color,
+                                )}
+                              >
+                                {c.label}
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {r.description}
+                            </p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">
+                                {r.category}
+                              </span>
+                              {r.flaggedItems > 0 && (
+                                <span className="flex items-center gap-1 text-rose-600 dark:text-rose-500">
+                                  <AlertIcon className="w-3 h-3" />
+                                  {r.flaggedItems} flagged
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1">
+                                <SandglassIcon className="w-3 h-3" />
+                                Updated {r.lastUpdated}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-4">
+                          <p className="text-2xl font-bold">{r.score}%</p>
+                          <div className="flex items-center gap-1 mt-1 justify-end">
+                            {r.trend === "up" ? (
+                              <ArrowUpRightIcon className="w-4 h-4 text-emerald-600" />
+                            ) : r.trend === "down" ? (
+                              <ArrowDownRightIcon className="w-4 h-4 text-rose-600" />
+                            ) : (
+                              <div className="w-4 h-0.5 bg-muted-foreground" />
+                            )}
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {r.trend}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-muted-foreground">
+                            Risk Score
+                          </span>
+                          <span className="text-xs font-medium">
+                            {r.score}% Safe
+                          </span>
+                        </div>
+                        <Progress value={r.score} className="h-2" />
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">
-                        Risk Score
-                      </span>
-                      <span className="text-xs font-medium">
-                        {risk.score}% Safe
-                      </span>
-                    </div>
-                    <Progress value={risk.score} className="h-2" />
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </CardContent>
-      </Card>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reports" className="mt-6">
+          <ReportDownloadPanel documents={DOCUMENTS} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
