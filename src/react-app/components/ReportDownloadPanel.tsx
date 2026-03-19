@@ -17,29 +17,12 @@ import {
   ManuscriptIcon,
   CheckIcon,
   CheckRingIcon,
-  AlertIcon,
-  DangerRingIcon,
   SandglassIcon,
-  DotsVerticalIcon,
   ArrowRightIcon,
-  ShieldColumnIcon,
-  SignalTowerIcon,
-  TrendUpIcon,
   LensIcon,
-  CalendarIcon,
   ArchiveIcon,
   SearchIcon,
-  FilterIcon,
-  EditIcon,
-  StorageIcon,
 } from "@/react-app/components/icons";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/react-app/components/ui/dropdown-menu";
 import { Input } from "@/react-app/components/ui/input";
 
 // ═══════════════════════════════════════════════════════════════════════════════
