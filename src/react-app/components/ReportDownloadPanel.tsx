@@ -10,58 +10,43 @@ import {
 import { Button } from "@/react-app/components/ui/button";
 import { Badge } from "@/react-app/components/ui/badge";
 import { Progress } from "@/react-app/components/ui/progress";
-// import { ScrollArea } from "@/react-app/components/ui/scroll-area";
-// import { Separator } from "@/react-app/components/ui/separator";
-// import {
-//   Dialog,
-//   DialogContent,
-//   DialogHeader,
-//   DialogTitle,
-//   DialogDescription,
-//   DialogFooter,
-// } from "@/react-app/components/ui/dialog";
+import { Separator } from "@/react-app/components/ui/separator";
 import { cn } from "@/react-app/lib/utils";
 import {
   DownloadIcon,
   ManuscriptIcon,
   CheckIcon,
   CheckRingIcon,
-  // AlertIcon,
-  // DangerRingIcon,
+  AlertIcon,
+  DangerRingIcon,
   SandglassIcon,
   DotsVerticalIcon,
   ArrowRightIcon,
   ShieldColumnIcon,
-  // SignalTowerIcon,
-  // TrendUpIcon,
+  SignalTowerIcon,
+  TrendUpIcon,
   LensIcon,
-  // GearIcon,
   CalendarIcon,
   ArchiveIcon,
   SearchIcon,
   FilterIcon,
-  // EditIcon,
-  // StorageIcon,
+  EditIcon,
+  StorageIcon,
 } from "@/react-app/components/icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  // DropdownMenuSeparator,
+  DropdownMenuSeparator,
 } from "@/react-app/components/ui/dropdown-menu";
-import {
-  // Tooltip,
-  // TooltipContent,
-  // TooltipProvider,
-  // TooltipTrigger,
-} from "@/react-app/components/ui/tooltip";
 import { Input } from "@/react-app/components/ui/input";
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DATA MODEL
+// TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Matches the Document type in DashboardDocumentsPage exactly
 export interface DocumentItem {
   id: string;
   name: string;
@@ -80,13 +65,11 @@ interface AusgabeblattRow {
   ampel?: Ampel;
   note?: string;
 }
-
 interface AusgabeblattSection {
   id: string;
   title: string;
   rows: AusgabeblattRow[];
 }
-
 interface WEAStatus {
   name: string;
   ampel: Ampel;
@@ -94,7 +77,6 @@ interface WEAStatus {
   parcel: string;
   contract: string;
 }
-
 interface DDiQReportData {
   projectName: string;
   preparedBy: string;
@@ -103,10 +85,11 @@ interface DDiQReportData {
   sections: AusgabeblattSection[];
   weaStatuses: WEAStatus[];
   findings: { domain: string; severity: Ampel; text: string }[];
+  analyzedDocuments: string[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DEMO DATA — Windpark Nordheide
+// DEMO DATA
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const DEMO_REPORT: DDiQReportData = {
@@ -118,6 +101,7 @@ const DEMO_REPORT: DDiQReportData = {
     month: "long",
     year: "numeric",
   }),
+  analyzedDocuments: [],
   sections: [
     {
       id: "overview",
@@ -147,7 +131,7 @@ const DEMO_REPORT: DDiQReportData = {
         },
         {
           label: "Wind Priority Zone",
-          value: "Yes – per Regional Plan (RROP) Harburg District 2021",
+          value: "Yes – per Regional Plan (RROP) Harburg 2021",
         },
       ],
     },
@@ -157,7 +141,7 @@ const DEMO_REPORT: DDiQReportData = {
       rows: [
         {
           label: "Usage Contracts",
-          value: "6 of 8 locations contractually secured (75%)",
+          value: "6 of 8 locations secured (75%)",
           ampel: "yellow",
         },
         {
@@ -178,18 +162,17 @@ const DEMO_REPORT: DDiQReportData = {
         { label: "Access Roads", value: "100% secured", ampel: "green" },
         {
           label: "Contract Error Rate",
-          value:
-            "2 contracts with missing signatures, 1 with inconsistent parcel designation",
+          value: "2 contracts with missing signatures, 1 inconsistent parcel",
           ampel: "red",
           note: "Renegotiation required for 3 contracts",
         },
         {
           label: "Contracts Reviewed",
-          value: "12 contracts reviewed (8 usage, 2 cable, 2 access)",
+          value: "12 contracts (8 usage, 2 cable, 2 access)",
         },
         {
           label: "Contracting Entity",
-          value: "All contracts with Nordheide Wind GmbH – consistent",
+          value: "All with Nordheide Wind GmbH – consistent",
           ampel: "green",
         },
       ],
@@ -200,34 +183,33 @@ const DEMO_REPORT: DDiQReportData = {
       rows: [
         {
           label: "BImSchG Permit",
-          value: "Applied on Sep 12, 2024 – decision pending",
+          value: "Applied Sep 12, 2024 – decision pending",
           ampel: "yellow",
         },
         {
-          label: "Environmental Impact Assessment",
-          value: "Completed – no objections raised",
+          label: "Environmental Impact",
+          value: "EIA completed – no objections",
           ampel: "green",
         },
         {
           label: "Species Protection",
-          value: "Red kite shutdown periods required (Apr–Aug)",
+          value: "Red kite shutdown required (Apr–Aug)",
           ampel: "yellow",
-          note: "Expert report by BioConsult 2024 available",
+          note: "BioConsult 2024 report available",
         },
         {
           label: "Noise & Shadow",
-          value: "Conditions met – assessment by CUBE Engineering",
+          value: "Conditions met – CUBE Engineering",
           ampel: "green",
         },
         {
-          label: "Public Authority Consultations",
-          value:
-            "12 authorities consulted, 11 no objections, 1 follow-up (heritage protection)",
+          label: "Authority Consultations",
+          value: "12 consulted, 11 clear, 1 follow-up (heritage)",
           ampel: "yellow",
         },
         {
           label: "Recurring Inspections",
-          value: "Not applicable (new installation)",
+          value: "N/A (new installation)",
           ampel: "green",
         },
       ],
@@ -238,12 +220,12 @@ const DEMO_REPORT: DDiQReportData = {
       rows: [
         {
           label: "Feed-in Tariff",
-          value: "EEG 2023 – awarded tariff: 7.35 ct/kWh",
+          value: "EEG 2023 – 7.35 ct/kWh awarded",
           ampel: "green",
         },
         {
-          label: "Direct Marketing / PPA",
-          value: "PPA with EnBW until 2040, 8.1 ct/kWh (Cap & Floor)",
+          label: "PPA",
+          value: "PPA with EnBW until 2040, 8.1 ct/kWh",
           ampel: "green",
         },
         {
@@ -252,7 +234,7 @@ const DEMO_REPORT: DDiQReportData = {
           ampel: "green",
         },
         {
-          label: "Project Financing",
+          label: "Financing",
           value: "KfW IPEX + NordLB, term sheet signed",
           ampel: "green",
         },
@@ -262,22 +244,21 @@ const DEMO_REPORT: DDiQReportData = {
           ampel: "green",
         },
         {
-          label: "Operations Management",
-          value: "Deutsche Windtechnik AG (technical + commercial)",
+          label: "Operations",
+          value: "Deutsche Windtechnik AG",
           ampel: "green",
         },
         {
           label: "Maintenance",
-          value:
-            "Full-service contract with Vestas (15 years), 97% availability guarantee",
+          value: "Vestas full-service 15yr, 97% availability",
           ampel: "green",
         },
         {
           label: "Insurance",
-          value: "Allianz Wind Energy Policy, incl. revenue loss insurance",
+          value: "Allianz Wind Energy Policy incl. revenue loss",
           ampel: "green",
         },
-        { label: "Open Liability Issues", value: "None known", ampel: "green" },
+        { label: "Open Liability", value: "None known", ampel: "green" },
       ],
     },
   ],
@@ -353,7 +334,7 @@ const DEMO_REPORT: DDiQReportData = {
     {
       domain: "Land Security",
       severity: "yellow",
-      text: "WEA 6 & 7: Contract signing pending. Deadline of Q1 2025 recommended.",
+      text: "WEA 6 & 7: Contract signing pending. Deadline Q1 2025 recommended.",
     },
     {
       domain: "Permits",
@@ -363,12 +344,12 @@ const DEMO_REPORT: DDiQReportData = {
     {
       domain: "Permits",
       severity: "yellow",
-      text: "Heritage protection: Follow-up request from Lower Heritage Authority regarding sightline assessment.",
+      text: "Heritage protection: Follow-up request for sightline assessment.",
     },
     {
       domain: "Permits",
       severity: "yellow",
-      text: "Red kite shutdown periods reduce expected yield by approx. 1.8%.",
+      text: "Red kite shutdown reduces expected yield by ~1.8%.",
     },
     {
       domain: "Economics",
@@ -378,10 +359,7 @@ const DEMO_REPORT: DDiQReportData = {
   ],
 };
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PRESETS
-// ═══════════════════════════════════════════════════════════════════════════════
-
+// Presets
 interface ReportPreset {
   id: string;
   name: string;
@@ -389,13 +367,11 @@ interface ReportPreset {
   sections: string[];
   estimatedPages: string;
 }
-
 const PRESETS: ReportPreset[] = [
   {
     id: "full",
     name: "Full DDiQ Report",
-    description:
-      "All output tables, land security status map, and action items",
+    description: "All tables, status map, and action items",
     sections: [
       "overview",
       "land",
@@ -409,47 +385,41 @@ const PRESETS: ReportPreset[] = [
   {
     id: "executive",
     name: "Executive Summary",
-    description: "Project overview, risk summary, and status map",
+    description: "Overview, risk summary, status map",
     sections: ["overview", "statusmap", "findings"],
     estimatedPages: "4–6",
   },
   {
     id: "land",
     name: "Land Security Audit",
-    description:
-      "Contract review, land registry, status map with traffic-light",
+    description: "Contracts, land registry, traffic-light map",
     sections: ["overview", "land", "statusmap", "findings"],
     estimatedPages: "8–10",
   },
   {
     id: "permit",
-    name: "Permit & Compliance Check",
-    description: "BImSchG, environmental conditions, authority consultations",
+    name: "Permit & Compliance",
+    description: "BImSchG, environment, authority consultations",
     sections: ["overview", "permits", "findings"],
     estimatedPages: "6–8",
   },
   {
     id: "economics",
-    name: "Economic & Contractual Review",
-    description: "EEG/PPA, financing, operations, maintenance, insurance",
+    name: "Economic Review",
+    description: "EEG/PPA, financing, operations, insurance",
     sections: ["overview", "economics", "findings"],
     estimatedPages: "6–8",
   },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// EXPORT FORMATS
-// ═══════════════════════════════════════════════════════════════════════════════
-
+// Export formats
 type ExportFormat = "pdf" | "docx" | "html" | "xlsx" | "csv" | "txt";
-
 interface FormatOption {
   id: ExportFormat;
   label: string;
   description: string;
   colorCls: string;
 }
-
 const FORMAT_OPTIONS: FormatOption[] = [
   {
     id: "pdf",
@@ -468,21 +438,21 @@ const FORMAT_OPTIONS: FormatOption[] = [
   {
     id: "html",
     label: "HTML",
-    description: "Interactive, shareable online",
+    description: "Interactive, shareable",
     colorCls:
       "text-violet-600 dark:text-violet-400 bg-violet-500/10 border-violet-500/30",
   },
   {
     id: "xlsx",
     label: "XLSX",
-    description: "Spreadsheet for data analysis",
+    description: "Spreadsheet for analysis",
     colorCls:
       "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
   },
   {
     id: "csv",
     label: "CSV",
-    description: "Plain data, any tool compatible",
+    description: "Plain data, any tool",
     colorCls:
       "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30",
   },
@@ -492,6 +462,40 @@ const FORMAT_OPTIONS: FormatOption[] = [
     description: "Plain text, lightweight",
     colorCls:
       "text-slate-600 dark:text-slate-400 bg-slate-500/10 border-slate-500/30",
+  },
+];
+
+// Section metadata
+const SECTION_META = [
+  {
+    id: "overview",
+    label: "Project Overview",
+    desc: "Name, location, WEA specs, companies",
+  },
+  {
+    id: "land",
+    label: "Land Security & Ownership",
+    desc: "Contracts, land registry, error rate",
+  },
+  {
+    id: "permits",
+    label: "Permits & Conditions",
+    desc: "BImSchG, EIA, species protection",
+  },
+  {
+    id: "economics",
+    label: "Economics & Operations",
+    desc: "EEG, PPA, financing, maintenance",
+  },
+  {
+    id: "statusmap",
+    label: "Status Map (Traffic Light)",
+    desc: "Green / Yellow / Red per WEA",
+  },
+  {
+    id: "findings",
+    label: "Action Items & Recommendations",
+    desc: "Prioritized issues and risks",
   },
 ];
 
@@ -505,39 +509,36 @@ const AmpelDot = ({
 }: {
   status: Ampel;
   size?: "sm" | "md";
-}) => {
-  const s = size === "md" ? "w-3 h-3" : "w-2 h-2";
-  const c = {
-    green: "bg-emerald-500",
-    yellow: "bg-amber-500",
-    red: "bg-rose-500",
-  };
-  return (
-    <span
-      className={cn("inline-block rounded-full flex-shrink-0", s, c[status])}
-    />
-  );
-};
+}) => (
+  <span
+    className={cn(
+      "inline-block rounded-full flex-shrink-0",
+      size === "md" ? "w-3 h-3" : "w-2 h-2",
+      { green: "bg-emerald-500", yellow: "bg-amber-500", red: "bg-rose-500" }[
+        status
+      ],
+    )}
+  />
+);
 
 const AmpelBadge = ({ status }: { status: Ampel }) => {
-  const cfg = {
+  const c = {
     green: {
-      bg: "bg-emerald-500/10 dark:bg-emerald-500/20",
+      bg: "bg-emerald-500/10",
       text: "text-emerald-700 dark:text-emerald-400",
-      label: "Secured",
+      l: "Secured",
     },
     yellow: {
-      bg: "bg-amber-500/10 dark:bg-amber-500/20",
+      bg: "bg-amber-500/10",
       text: "text-amber-700 dark:text-amber-400",
-      label: "Partial",
+      l: "Partial",
     },
     red: {
-      bg: "bg-rose-500/10 dark:bg-rose-500/20",
+      bg: "bg-rose-500/10",
       text: "text-rose-700 dark:text-rose-400",
-      label: "Open",
+      l: "Open",
     },
-  };
-  const c = cfg[status];
+  }[status];
   return (
     <span
       className={cn(
@@ -547,7 +548,7 @@ const AmpelBadge = ({ status }: { status: Ampel }) => {
       )}
     >
       <AmpelDot status={status} />
-      {c.label}
+      {c.l}
     </span>
   );
 };
@@ -558,19 +559,19 @@ const AusgabeblattTable = ({ section }: { section: AusgabeblattSection }) => (
       <h4 className="text-sm font-semibold">{section.title}</h4>
     </div>
     <div className="divide-y divide-border/30">
-      {section.rows.map((row, i) => (
+      {section.rows.map((r, i) => (
         <div key={i} className="flex items-start gap-3 px-4 py-2.5 text-sm">
           <span className="text-muted-foreground font-medium min-w-[200px] flex-shrink-0">
-            {row.label}
+            {r.label}
           </span>
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-2">
-              {row.ampel && <AmpelDot status={row.ampel} size="md" />}
-              <span>{row.value}</span>
+              {r.ampel && <AmpelDot status={r.ampel} size="md" />}
+              <span>{r.value}</span>
             </div>
-            {row.note && (
+            {r.note && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 italic">
-                {row.note}
+                {r.note}
               </p>
             )}
           </div>
@@ -607,32 +608,30 @@ const StatusMap = ({ statuses }: { statuses: WEAStatus[] }) => {
           </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {statuses.map((w) => {
-            const bc = {
-              green: "border-emerald-500/40",
-              yellow: "border-amber-500/40",
-              red: "border-rose-500/40",
-            }[w.ampel];
-            const bg = {
-              green: "bg-emerald-500/5",
-              yellow: "bg-amber-500/5",
-              red: "bg-rose-500/5",
-            }[w.ampel];
-            return (
-              <div key={w.name} className={cn("p-3 rounded-md border", bc, bg)}>
-                <div className="flex items-center gap-2 mb-1">
-                  <AmpelDot status={w.ampel} size="md" />
-                  <span className="text-sm font-semibold">{w.name}</span>
-                  <AmpelBadge status={w.ampel} />
-                </div>
-                <div className="text-xs text-muted-foreground space-y-0.5 ml-5">
-                  <p>Owner: {w.owner}</p>
-                  <p>Parcel: {w.parcel}</p>
-                  <p>Contract: {w.contract}</p>
-                </div>
+          {statuses.map((w) => (
+            <div
+              key={w.name}
+              className={cn(
+                "p-3 rounded-md border",
+                {
+                  green: "border-emerald-500/40 bg-emerald-500/5",
+                  yellow: "border-amber-500/40 bg-amber-500/5",
+                  red: "border-rose-500/40 bg-rose-500/5",
+                }[w.ampel],
+              )}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <AmpelDot status={w.ampel} size="md" />
+                <span className="text-sm font-semibold">{w.name}</span>
+                <AmpelBadge status={w.ampel} />
               </div>
-            );
-          })}
+              <div className="text-xs text-muted-foreground space-y-0.5 ml-5">
+                <p>Owner: {w.owner}</p>
+                <p>Parcel: {w.parcel}</p>
+                <p>Contract: {w.contract}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -665,198 +664,167 @@ const FindingsTable = ({
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// REPORT GENERATORS (per format)
+// REPORT GENERATORS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function generateHTML(data: DDiQReportData, active: string[]): string {
-  const secs = data.sections.filter((s) => active.includes(s.id));
-  const ampelC = (a: Ampel) =>
-    ({ green: "#059669", yellow: "#d97706", red: "#dc2626" })[a];
-  const ampelL = (a: Ampel) =>
-    ({ green: "Secured", yellow: "Partial", red: "Open" })[a];
-
-  const secHTML = secs
+function generateHTML(d: DDiQReportData, a: string[]): string {
+  const secs = d.sections.filter((s) => a.includes(s.id));
+  const ac = (x: Ampel) =>
+    ({ green: "#059669", yellow: "#d97706", red: "#dc2626" })[x];
+  const al = (x: Ampel) =>
+    ({ green: "Secured", yellow: "Partial", red: "Open" })[x];
+  const secH = secs
     .map(
-      (sec) => `
-    <h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">${sec.title}</h2>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;width:220px;">Category</th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">Status / Details</th></tr></thead>
-      <tbody>${sec.rows.map((r) => `<tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:500;vertical-align:top;">${r.label}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;vertical-align:top;">${r.ampel ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ampelC(r.ampel)};margin-right:6px;vertical-align:middle;"></span>` : ""}${r.value}${r.note ? `<br/><em style="color:#d97706;font-size:12px;">${r.note}</em>` : ""}</td></tr>`).join("")}</tbody>
-    </table>`,
+      (s) =>
+        `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">${s.title}</h2><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;width:220px;">Category</th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;">Status / Details</th></tr></thead><tbody>${s.rows.map((r) => `<tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:500;vertical-align:top;">${r.label}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${r.ampel ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ac(r.ampel)};margin-right:6px;vertical-align:middle;"></span>` : ""}${r.value}${r.note ? `<br><em style="color:#d97706;font-size:12px;">${r.note}</em>` : ""}</td></tr>`).join("")}</tbody></table>`,
     )
     .join("");
-
-  const mapHTML = active.includes("statusmap")
-    ? `
-    <h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Land Security Status Map</h2>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead><tr style="background:#f8fafc;"><th style="padding:8px 12px;border:1px solid #e2e8f0;">WEA</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Status</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Owner</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Parcel</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Contract</th></tr></thead>
-      <tbody>${data.weaStatuses.map((w) => `<tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">${w.name}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ampelC(w.ampel)};margin-right:6px;vertical-align:middle;"></span>${ampelL(w.ampel)}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.owner}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.parcel}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.contract}</td></tr>`).join("")}</tbody></table>`
+  const docList =
+    d.analyzedDocuments.length > 0
+      ? `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Analyzed Documents</h2><ul style="font-size:13px;color:#475569;">${d.analyzedDocuments.map((n) => `<li style="margin:4px 0;">${n}</li>`).join("")}</ul>`
+      : "";
+  const mapH = a.includes("statusmap")
+    ? `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Land Security Status Map</h2><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;"><th style="padding:8px 12px;border:1px solid #e2e8f0;">WEA</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Status</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Owner</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Parcel</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Contract</th></tr></thead><tbody>${d.weaStatuses.map((w) => `<tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">${w.name}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ac(w.ampel)};margin-right:6px;vertical-align:middle;"></span>${al(w.ampel)}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.owner}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.parcel}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.contract}</td></tr>`).join("")}</tbody></table>`
     : "";
-
-  const findHTML = active.includes("findings")
-    ? `
-    <h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Action Items & Recommendations</h2>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead><tr style="background:#f8fafc;"><th style="width:24px;border:1px solid #e2e8f0;padding:8px;"></th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;width:140px;">Domain</th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;">Recommendation</th></tr></thead>
-      <tbody>${data.findings.map((f) => `<tr><td style="text-align:center;padding:8px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ampelC(f.severity)};"></span></td><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:500;">${f.domain}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${f.text}</td></tr>`).join("")}</tbody></table>`
+  const findH = a.includes("findings")
+    ? `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Action Items</h2><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;"><th style="width:24px;border:1px solid #e2e8f0;padding:8px;"></th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;width:140px;">Domain</th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;">Recommendation</th></tr></thead><tbody>${d.findings.map((f) => `<tr><td style="text-align:center;padding:8px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ac(f.severity)};"></span></td><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:500;">${f.domain}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${f.text}</td></tr>`).join("")}</tbody></table>`
     : "";
-
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>DDiQ Report – ${data.projectName}</title><style>@media print{body{font-size:12px}h1{font-size:18px}h2{font-size:14px}table{page-break-inside:avoid}}</style></head>
-<body style="max-width:900px;margin:40px auto;padding:0 24px;font-family:system-ui,-apple-system,sans-serif;color:#1e293b;line-height:1.5;">
-<div style="border-bottom:3px solid #1e293b;padding-bottom:16px;margin-bottom:32px;">
-<h1 style="font-size:22px;font-weight:800;margin:0;">DDiQ Due Diligence Report</h1>
-<p style="font-size:18px;font-weight:600;color:#475569;margin:4px 0 0;">${data.projectName}</p>
-<div style="display:flex;gap:24px;margin-top:12px;font-size:12px;color:#64748b;"><span>Prepared for: ${data.preparedFor}</span><span>By: ${data.preparedBy}</span><span>Date: ${data.date}</span></div>
-</div>${secHTML}${mapHTML}${findHTML}
-<div style="margin-top:40px;padding-top:16px;border-top:2px solid #e2e8f0;font-size:11px;color:#94a3b8;">
-<p>This report was auto-generated by the LAI Due Diligence System based on the DDiQ v1 framework. Contents do not substitute individual legal or financial review.</p>
-</div></body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>DDiQ Report – ${d.projectName}</title><style>@media print{body{font-size:12px}h1{font-size:18px}h2{font-size:14px}table{page-break-inside:avoid}}</style></head><body style="max-width:900px;margin:40px auto;padding:0 24px;font-family:system-ui,-apple-system,sans-serif;color:#1e293b;line-height:1.5;"><div style="border-bottom:3px solid #1e293b;padding-bottom:16px;margin-bottom:32px;"><h1 style="font-size:22px;font-weight:800;margin:0;">DDiQ Due Diligence Report</h1><p style="font-size:18px;font-weight:600;color:#475569;margin:4px 0 0;">${d.projectName}</p><div style="display:flex;gap:24px;margin-top:12px;font-size:12px;color:#64748b;"><span>Prepared for: ${d.preparedFor}</span><span>By: ${d.preparedBy}</span><span>Date: ${d.date}</span></div></div>${docList}${secH}${mapH}${findH}<div style="margin-top:40px;padding-top:16px;border-top:2px solid #e2e8f0;font-size:11px;color:#94a3b8;">Auto-generated by LAI · DDiQ v1. Does not substitute legal review.</div></body></html>`;
 }
 
-function generateCSV(data: DDiQReportData, active: string[]): string {
-  const lines: string[] = ["Section,Category,Value,Status"];
-  data.sections
-    .filter((s) => active.includes(s.id))
-    .forEach((sec) => {
-      sec.rows.forEach((r) => {
-        lines.push(
-          `"${sec.title}","${r.label}","${r.value.replace(/"/g, '""')}","${r.ampel || ""}"`,
-        );
-      });
-    });
-  if (active.includes("statusmap")) {
-    data.weaStatuses.forEach((w) => {
-      lines.push(
-        `"Land Security Map","${w.name}","Owner: ${w.owner} | Parcel: ${w.parcel} | Contract: ${w.contract}","${w.ampel}"`,
-      );
-    });
-  }
-  if (active.includes("findings")) {
-    data.findings.forEach((f) => {
-      lines.push(
+function generateCSV(d: DDiQReportData, a: string[]): string {
+  const l = ["Section,Category,Value,Status"];
+  d.sections
+    .filter((s) => a.includes(s.id))
+    .forEach((s) =>
+      s.rows.forEach((r) =>
+        l.push(
+          `"${s.title}","${r.label}","${r.value.replace(/"/g, '""')}","${r.ampel || ""}"`,
+        ),
+      ),
+    );
+  if (a.includes("statusmap"))
+    d.weaStatuses.forEach((w) =>
+      l.push(
+        `"Status Map","${w.name}","Owner: ${w.owner} | Parcel: ${w.parcel} | Contract: ${w.contract}","${w.ampel}"`,
+      ),
+    );
+  if (a.includes("findings"))
+    d.findings.forEach((f) =>
+      l.push(
         `"Action Items","${f.domain}","${f.text.replace(/"/g, '""')}","${f.severity}"`,
-      );
-    });
-  }
-  return lines.join("\n");
+      ),
+    );
+  return l.join("\n");
 }
 
-function generateTXT(data: DDiQReportData, active: string[]): string {
-  const sep = "=".repeat(72);
-  const lines: string[] = [
-    sep,
+function generateTXT(d: DDiQReportData, a: string[]): string {
+  const l = [
+    "=".repeat(72),
     `  DDiQ Due Diligence Report`,
-    `  ${data.projectName}`,
-    sep,
+    `  ${d.projectName}`,
+    "=".repeat(72),
     "",
-    `  Prepared for: ${data.preparedFor}`,
-    `  By: ${data.preparedBy}`,
-    `  Date: ${data.date}`,
+    `  For: ${d.preparedFor}`,
+    `  By: ${d.preparedBy}`,
+    `  Date: ${d.date}`,
     "",
   ];
-  data.sections
-    .filter((s) => active.includes(s.id))
-    .forEach((sec) => {
-      lines.push(
+  if (d.analyzedDocuments.length) {
+    l.push("  Analyzed Documents:");
+    d.analyzedDocuments.forEach((n) => l.push(`    - ${n}`));
+    l.push("");
+  }
+  d.sections
+    .filter((s) => a.includes(s.id))
+    .forEach((s) => {
+      l.push(
         "",
-        `----- ${sec.title.toUpperCase()} ${"─".repeat(Math.max(0, 60 - sec.title.length))}`,
+        `--- ${s.title.toUpperCase()} ${"─".repeat(Math.max(0, 58 - s.title.length))}`,
         "",
       );
-      sec.rows.forEach((r) => {
-        const status = r.ampel ? ` [${r.ampel.toUpperCase()}]` : "";
-        lines.push(`  ${r.label.padEnd(30)} ${r.value}${status}`);
-        if (r.note) lines.push(`  ${"".padEnd(30)} >> ${r.note}`);
+      s.rows.forEach((r) => {
+        l.push(
+          `  ${r.label.padEnd(28)} ${r.value}${r.ampel ? ` [${r.ampel.toUpperCase()}]` : ""}`,
+        );
+        if (r.note) l.push(`  ${"".padEnd(28)} >> ${r.note}`);
       });
     });
-  if (active.includes("statusmap")) {
-    lines.push(
+  if (a.includes("statusmap")) {
+    l.push(
       "",
-      "----- LAND SECURITY STATUS MAP ────────────────────────────────────",
+      "--- STATUS MAP ────────────────────────────────────────────────────",
       "",
     );
-    data.weaStatuses.forEach((w) => {
-      lines.push(
+    d.weaStatuses.forEach((w) =>
+      l.push(
         `  [${w.ampel.toUpperCase().padEnd(6)}] ${w.name}  |  ${w.owner}  |  ${w.parcel}  |  ${w.contract}`,
-      );
-    });
+      ),
+    );
   }
-  if (active.includes("findings")) {
-    lines.push(
+  if (a.includes("findings")) {
+    l.push(
       "",
-      "----- ACTION ITEMS & RECOMMENDATIONS ──────────────────────────────",
+      "--- ACTION ITEMS ──────────────────────────────────────────────────",
       "",
     );
-    data.findings.forEach((f, i) => {
-      lines.push(
+    d.findings.forEach((f, i) =>
+      l.push(
         `  ${i + 1}. [${f.severity.toUpperCase()}] ${f.domain}: ${f.text}`,
-      );
-    });
+      ),
+    );
   }
-  lines.push(
-    "",
-    sep,
-    "  Auto-generated by LAI Due Diligence System · DDiQ v1",
-    sep,
-  );
-  return lines.join("\n");
+  l.push("", "=".repeat(72), "  LAI DDiQ v1", "=".repeat(72));
+  return l.join("\n");
 }
 
-function downloadFile(content: string, filename: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
+function downloadFile(content: string, filename: string, mime: string) {
+  const b = new Blob([content], { type: mime });
+  const u = URL.createObjectURL(b);
   const a = document.createElement("a");
-  a.href = url;
+  a.href = u;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  URL.revokeObjectURL(u);
   document.body.removeChild(a);
 }
 
-function downloadFormat(
-  format: ExportFormat,
-  data: DDiQReportData,
-  active: string[],
-) {
-  const stem = `DDiQ_${data.projectName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}`;
-  switch (format) {
+function downloadFormat(fmt: ExportFormat, d: DDiQReportData, a: string[]) {
+  const s = `DDiQ_${d.projectName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}`;
+  switch (fmt) {
     case "html":
       return downloadFile(
-        generateHTML(data, active),
-        `${stem}.html`,
+        generateHTML(d, a),
+        `${s}.html`,
         "text/html;charset=utf-8",
       );
     case "csv":
       return downloadFile(
-        generateCSV(data, active),
-        `${stem}.csv`,
+        generateCSV(d, a),
+        `${s}.csv`,
         "text/csv;charset=utf-8",
       );
     case "txt":
       return downloadFile(
-        generateTXT(data, active),
-        `${stem}.txt`,
+        generateTXT(d, a),
+        `${s}.txt`,
         "text/plain;charset=utf-8",
       );
     case "pdf":
       return downloadFile(
-        generateHTML(data, active),
-        `${stem}.html`,
+        generateHTML(d, a),
+        `${s}.html`,
         "text/html;charset=utf-8",
-      ); // Open HTML → Print to PDF
+      );
     case "docx":
-      return downloadFile(
-        generateHTML(data, active),
-        `${stem}.doc`,
-        "application/msword",
-      ); // Basic .doc from HTML
+      return downloadFile(generateHTML(d, a), `${s}.doc`, "application/msword");
     case "xlsx":
       return downloadFile(
-        generateCSV(data, active),
-        `${stem}.csv`,
+        generateCSV(d, a),
+        `${s}.csv`,
         "text/csv;charset=utf-8",
-      ); // CSV importable to Excel
+      );
   }
 }
 
@@ -864,17 +832,25 @@ function downloadFormat(
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
+type Step = "select-docs" | "configure" | "preview" | "exporting";
+
 interface Props {
   documents: DocumentItem[];
   className?: string;
 }
-type Step = "list" | "configure" | "preview" | "exporting";
 
 export default function ReportDownloadPanel({ documents, className }: Props) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string | null>(null);
-  const [step, setStep] = useState<Step>("list");
-  const [targetDocId, setTargetDocId] = useState<string | "all">("all");
+  const analyzedDocs = useMemo(
+    () => documents.filter((d) => d.status === "analyzed"),
+    [documents],
+  );
+
+  // Document selection
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const [docSearch, setDocSearch] = useState("");
+
+  // Wizard
+  const [step, setStep] = useState<Step>("select-docs");
   const [selectedPreset, setSelectedPreset] = useState<ReportPreset>(
     PRESETS[0],
   );
@@ -887,83 +863,19 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportDone, setExportDone] = useState(false);
 
-  const analyzedDocs = useMemo(
-    () => documents.filter((d) => d.status === "analyzed"),
-    [documents],
+  const selectedDocs = useMemo(
+    () => documents.filter((d) => selectedDocIds.has(d.id)),
+    [documents, selectedDocIds],
   );
-  const filteredDocs = useMemo(
-    () =>
-      documents.filter((d) => {
-        const ms =
-          d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          d.category.toLowerCase().includes(searchTerm.toLowerCase());
-        return ms && (!filterStatus || d.status === filterStatus);
-      }),
-    [documents, searchTerm, filterStatus],
-  );
-
-  const targetLabel =
-    targetDocId === "all"
-      ? `All Documents (${analyzedDocs.length})`
-      : documents.find((d) => d.id === targetDocId)?.name || "Document";
-
-  const openWizard = (target: string | "all", presetId?: string) => {
-    setTargetDocId(target);
-    const preset = presetId
-      ? PRESETS.find((p) => p.id === presetId) || PRESETS[0]
-      : PRESETS[0];
-    setSelectedPreset(preset);
-    setActiveSections([...preset.sections]);
-    setSelectedFormats(["pdf"]);
-    setExportProgress(0);
-    setExportDone(false);
-    setStep("configure");
-  };
-
-  const pickPreset = (p: ReportPreset) => {
-    setSelectedPreset(p);
-    setActiveSections([...p.sections]);
-  };
-  const toggleSection = (id: string) =>
-    setActiveSections((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+  const filteredAnalyzed = useMemo(() => {
+    if (!docSearch) return analyzedDocs;
+    const q = docSearch.toLowerCase();
+    return analyzedDocs.filter(
+      (d) =>
+        d.name.toLowerCase().includes(q) ||
+        d.category.toLowerCase().includes(q),
     );
-  const toggleFormat = (id: ExportFormat) =>
-    setSelectedFormats((prev) =>
-      prev.includes(id)
-        ? prev.length > 1
-          ? prev.filter((f) => f !== id)
-          : prev
-        : [...prev, id],
-    );
-  const resetToList = () => {
-    setStep("list");
-    setExportDone(false);
-  };
-
-  const doExport = () => {
-    setStep("exporting");
-    setExportProgress(0);
-    setExportDone(false);
-    let p = 0;
-    const iv = setInterval(() => {
-      p += Math.random() * 20 + 8;
-      if (p >= 100) {
-        clearInterval(iv);
-        setExportProgress(100);
-        setExportDone(true);
-      } else setExportProgress(Math.min(p, 98));
-    }, 300);
-  };
-
-  const handleDownloadAll = () => {
-    selectedFormats.forEach((fmt) =>
-      downloadFormat(fmt, DEMO_REPORT, activeSections),
-    );
-  };
-  const handleDownloadOne = (fmt: ExportFormat) => {
-    downloadFormat(fmt, DEMO_REPORT, activeSections);
-  };
+  }, [analyzedDocs, docSearch]);
 
   const statusCfg = {
     analyzed: {
@@ -986,255 +898,296 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
     },
   };
 
-  const sectionMeta = [
-    {
-      id: "overview",
-      label: "Project Overview",
-      desc: "Name, location, WEA specs, companies",
-    },
-    {
-      id: "land",
-      label: "Land Security & Ownership",
-      desc: "Contracts, land registry, error rate",
-    },
-    {
-      id: "permits",
-      label: "Permits & Conditions",
-      desc: "BImSchG, EIA, species protection, inspections",
-    },
-    {
-      id: "economics",
-      label: "Economics & Operations",
-      desc: "EEG, PPA, financing, maintenance, insurance",
-    },
-    {
-      id: "statusmap",
-      label: "Status Map (Traffic Light)",
-      desc: "Green / Yellow / Red per WEA and parcel",
-    },
-    {
-      id: "findings",
-      label: "Action Items & Recommendations",
-      desc: "Prioritized open issues and risks",
-    },
-  ];
+  // Actions
+  const toggleDoc = (id: string) =>
+    setSelectedDocIds((prev) => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  const selectAll = () =>
+    setSelectedDocIds(new Set(analyzedDocs.map((d) => d.id)));
+  const deselectAll = () => setSelectedDocIds(new Set());
+  const toggleSection = (id: string) =>
+    setActiveSections((p) =>
+      p.includes(id) ? p.filter((s) => s !== id) : [...p, id],
+    );
+  const toggleFormat = (id: ExportFormat) =>
+    setSelectedFormats((p) =>
+      p.includes(id)
+        ? p.length > 1
+          ? p.filter((f) => f !== id)
+          : p
+        : [...p, id],
+    );
+  const pickPreset = (p: ReportPreset) => {
+    setSelectedPreset(p);
+    setActiveSections([...p.sections]);
+  };
+  const resetToStart = () => {
+    setStep("select-docs");
+    setExportDone(false);
+  };
 
-  // ═════════ STEP: LIST ═════════════════════════════════════════════════════
+  const doExport = () => {
+    setStep("exporting");
+    setExportProgress(0);
+    setExportDone(false);
+    let p = 0;
+    const iv = setInterval(() => {
+      p += Math.random() * 20 + 8;
+      if (p >= 100) {
+        clearInterval(iv);
+        setExportProgress(100);
+        setExportDone(true);
+      } else setExportProgress(Math.min(p, 98));
+    }, 300);
+  };
 
-  if (step === "list")
+  const getReportData = (): DDiQReportData => ({
+    ...DEMO_REPORT,
+    analyzedDocuments: selectedDocs.map((d) => d.name),
+  });
+
+  const handleDownloadAll = () => {
+    const rd = getReportData();
+    selectedFormats.forEach((f) => downloadFormat(f, rd, activeSections));
+  };
+  const handleDownloadOne = (fmt: ExportFormat) =>
+    downloadFormat(fmt, getReportData(), activeSections);
+
+  // ═══════════ STEP 1: SELECT DOCUMENTS ═══════════════════════════════════
+
+  if (step === "select-docs")
     return (
       <div className={cn("space-y-6", className)}>
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold">DDiQ Report Builder</h2>
             <p className="text-sm text-muted-foreground">
-              Generate due diligence reports based on the DDiQ framework
+              Select documents for due diligence analysis, then configure your
+              report
             </p>
           </div>
-          <Button
-            size="sm"
-            onClick={() => openWizard("all")}
-            disabled={analyzedDocs.length === 0}
-            className="shadow-sm"
-          >
-            <DownloadIcon className="w-4 h-4 mr-2" />
-            Full DDiQ Report
-          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            {
-              label: "Documents",
-              value: documents.length,
-              sub: "Uploaded",
-              Icon: ManuscriptIcon,
-              bCls: "",
-            },
-            {
-              label: "Report Ready",
-              value: analyzedDocs.length,
-              sub: "Analyzed",
-              Icon: CheckRingIcon,
-              bCls: "border-l-4 border-l-emerald-500/50",
-              vCls: "text-emerald-600 dark:text-emerald-500",
-            },
-            {
-              label: "DDiQ Domains",
-              value: "5",
-              sub: "59 review questions",
-              Icon: ShieldColumnIcon,
-              bCls: "border-l-4 border-l-blue-500/50",
-              vCls: "text-blue-600 dark:text-blue-500",
-            },
-          ].map((s) => (
-            <Card
-              key={s.label}
-              className={cn(
-                "bg-card/50 backdrop-blur border-border/50",
-                s.bCls,
-              )}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{s.label}</p>
-                    <p
-                      className={cn("text-2xl font-bold mt-2", (s as any).vCls)}
-                    >
-                      {s.value}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {s.sub}
-                    </p>
-                  </div>
-                  <div className="p-2.5 rounded-md bg-slate-100 dark:bg-slate-800">
-                    <s.Icon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                  </div>
+          <Card className="bg-card/50 backdrop-blur border-border/50">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Total Uploaded
+                  </p>
+                  <p className="text-2xl font-bold mt-2">{documents.length}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    From Documents page & Chat
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+                <div className="p-2.5 rounded-md bg-slate-100 dark:bg-slate-800">
+                  <ManuscriptIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/50 backdrop-blur border-border/50 border-l-4 border-l-emerald-500/50">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Ready for Report
+                  </p>
+                  <p className="text-2xl font-bold mt-2 text-emerald-600 dark:text-emerald-500">
+                    {analyzedDocs.length}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Analyzed documents
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-md bg-emerald-500/10">
+                  <CheckRingIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/50 backdrop-blur border-border/50 border-l-4 border-l-blue-500/50">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Selected</p>
+                  <p className="text-2xl font-bold mt-2 text-blue-600 dark:text-blue-500">
+                    {selectedDocIds.size}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    For this report
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-md bg-blue-500/10">
+                  <DownloadIcon className="w-5 h-5 text-blue-600 dark:text-blue-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1">
-            <SearchIcon className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search documents..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <FilterIcon className="w-4 h-4 mr-2" />
-                {filterStatus
-                  ? filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)
-                  : "All"}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setFilterStatus(null)}>
-                All
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterStatus("analyzed")}>
-                Analyzed
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterStatus("pending")}>
-                Pending
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterStatus("archived")}>
-                Archived
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
+        {/* Document selection */}
         <Card className="bg-card/50 backdrop-blur border-border/50">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <ManuscriptIcon className="w-5 h-5" />
-              Documents ({filteredDocs.length})
-            </CardTitle>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">
+                Select Documents for Analysis
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={selectAll}
+                  className="text-xs h-7"
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={deselectAll}
+                  className="text-xs h-7"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {filteredDocs.length === 0 ? (
-              <div className="text-center py-12">
+          <CardContent>
+            <div className="relative mb-3">
+              <SearchIcon className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search analyzed documents..."
+                className="pl-10 h-9 text-sm"
+                value={docSearch}
+                onChange={(e) => setDocSearch(e.target.value)}
+              />
+            </div>
+
+            {analyzedDocs.length === 0 ? (
+              <div className="text-center py-8">
                 <ManuscriptIcon className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-40" />
                 <p className="text-sm text-muted-foreground">
-                  No documents found
+                  No analyzed documents available
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload and analyze documents on the Documents page first
                 </p>
               </div>
             ) : (
-              filteredDocs.map((doc) => {
-                const sc = statusCfg[doc.status];
-                return (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
-                  >
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
+              <div className="space-y-1.5">
+                {filteredAnalyzed.map((doc) => {
+                  const isSelected = selectedDocIds.has(doc.id);
+                  return (
+                    <div
+                      key={doc.id}
+                      onClick={() => toggleDoc(doc.id)}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                        isSelected
+                          ? "border-primary/40 bg-primary/5"
+                          : "border-transparent hover:bg-muted/40",
+                      )}
+                    >
                       <div
                         className={cn(
-                          "p-2 rounded-lg flex-shrink-0 border border-border/50",
-                          sc.bg,
+                          "w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors",
+                          isSelected
+                            ? "bg-primary border-primary"
+                            : "border-border",
                         )}
                       >
-                        <sc.Icon className={cn("w-5 h-5", sc.color)} />
+                        {isSelected && (
+                          <CheckIcon className="w-3 h-3 text-primary-foreground" />
+                        )}
+                      </div>
+                      <div className="p-1.5 rounded-md bg-emerald-500/10">
+                        <CheckRingIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium truncate">{doc.name}</p>
-                          <span
-                            className={cn(
-                              "text-xs font-medium px-2 py-0.5 rounded-md",
-                              sc.bg,
-                              sc.color,
-                            )}
-                          >
-                            {sc.label}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <p
+                          className={cn(
+                            "text-sm font-medium truncate",
+                            !isSelected && "text-muted-foreground",
+                          )}
+                        >
+                          {doc.name}
+                        </p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                           <span>{doc.size.toFixed(1)} MB</span>
-                          <span className="flex items-center gap-1">
-                            <CalendarIcon className="w-3 h-3" />
-                            {doc.uploadDate}
-                          </span>
-                          <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
+                          <span>{doc.uploadDate}</span>
+                          <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px]">
                             {doc.category}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={doc.status !== "analyzed"}
-                        onClick={() => openWizard(doc.id)}
-                        className="h-8 shadow-sm"
-                      >
-                        <DownloadIcon className="w-3.5 h-3.5 mr-1.5" />
-                        DDiQ Report
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            disabled={doc.status !== "analyzed"}
-                          >
-                            <DotsVerticalIcon className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                          {PRESETS.map((p) => (
-                            <DropdownMenuItem
-                              key={p.id}
-                              onClick={() => openWizard(doc.id, p.id)}
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Pending/archived shown as disabled */}
+            {documents.filter((d) => d.status !== "analyzed").length > 0 && (
+              <>
+                <Separator className="my-4" />
+                <p className="text-xs text-muted-foreground mb-2">
+                  Not available for report (pending or archived):
+                </p>
+                <div className="space-y-1 opacity-50">
+                  {documents
+                    .filter((d) => d.status !== "analyzed")
+                    .map((doc) => {
+                      const sc = statusCfg[doc.status];
+                      return (
+                        <div
+                          key={doc.id}
+                          className="flex items-center gap-3 p-2.5 rounded-lg"
+                        >
+                          <div className="w-5 h-5 rounded border border-border flex items-center justify-center flex-shrink-0" />
+                          <div className={cn("p-1.5 rounded-md", sc.bg)}>
+                            <sc.Icon className={cn("w-4 h-4", sc.color)} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-muted-foreground truncate">
+                              {doc.name}
+                            </p>
+                            <span
+                              className={cn(
+                                "text-[10px] font-medium px-1.5 py-0.5 rounded",
+                                sc.bg,
+                                sc.color,
+                              )}
                             >
-                              <ArrowRightIcon className="w-4 h-4 mr-2" />
-                              {p.name}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                );
-              })
+                              {sc.label}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
+
+        <div className="flex justify-end">
+          <Button
+            onClick={() => setStep("configure")}
+            disabled={selectedDocIds.size === 0}
+            className="shadow-sm"
+          >
+            Continue to Configure <ArrowRightIcon className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
       </div>
     );
 
-  // ═════════ STEP: CONFIGURE ════════════════════════════════════════════════
+  // ═══════════ STEP 2: CONFIGURE ══════════════════════════════════════════
 
   if (step === "configure")
     return (
@@ -1243,7 +1196,7 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={resetToList}
+            onClick={() => setStep("select-docs")}
             className="text-xs h-7 px-2"
           >
             ← Back
@@ -1251,7 +1204,15 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
           <div>
             <h2 className="text-lg font-semibold">Configure Report</h2>
             <p className="text-sm text-muted-foreground">
-              Target: {targetLabel}
+              {selectedDocIds.size} document
+              {selectedDocIds.size !== 1 ? "s" : ""} selected:{" "}
+              {selectedDocs
+                .map((d) => d.name)
+                .slice(0, 2)
+                .join(", ")}
+              {selectedDocs.length > 2
+                ? ` +${selectedDocs.length - 2} more`
+                : ""}
             </p>
           </div>
         </div>
@@ -1303,7 +1264,7 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {sectionMeta.map((sm) => {
+            {SECTION_META.map((sm) => {
               const active = activeSections.includes(sm.id);
               return (
                 <div
@@ -1318,7 +1279,7 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
                 >
                   <div
                     className={cn(
-                      "w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors",
+                      "w-5 h-5 rounded border flex items-center justify-center flex-shrink-0",
                       active ? "bg-primary border-primary" : "border-border",
                     )}
                   >
@@ -1345,11 +1306,11 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
           </CardContent>
         </Card>
 
-        {/* Export Formats */}
+        {/* Formats */}
         <Card className="bg-card/50 backdrop-blur border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">
-              Export Formats (select one or more)
+              Export Formats
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1369,7 +1330,7 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
                   >
                     <div
                       className={cn(
-                        "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors",
+                        "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
                         active ? "bg-primary border-primary" : "border-border",
                       )}
                     >
@@ -1394,16 +1355,12 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
                 );
               })}
             </div>
-            <p className="text-[11px] text-muted-foreground mt-3">
-              PDF & DOCX export as printable HTML. XLSX exports as CSV
-              importable to Excel. All formats download instantly.
-            </p>
           </CardContent>
         </Card>
 
-        <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={resetToList}>
-            Cancel
+        <div className="flex justify-between">
+          <Button variant="outline" onClick={() => setStep("select-docs")}>
+            Back
           </Button>
           <Button
             onClick={() => setStep("preview")}
@@ -1417,12 +1374,11 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
       </div>
     );
 
-  // ═════════ STEP: PREVIEW ══════════════════════════════════════════════════
+  // ═══════════ STEP 3: PREVIEW ════════════════════════════════════════════
 
   if (step === "preview") {
-    const visSec = DEMO_REPORT.sections.filter((s) =>
-      activeSections.includes(s.id),
-    );
+    const rd = getReportData();
+    const visSec = rd.sections.filter((s) => activeSections.includes(s.id));
     return (
       <div className={cn("space-y-6", className)}>
         <div className="flex items-center justify-between">
@@ -1438,12 +1394,13 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
             <div>
               <h2 className="text-lg font-semibold">Report Preview</h2>
               <p className="text-sm text-muted-foreground">
-                {selectedPreset.name} — {targetLabel}
+                {selectedPreset.name} · {selectedDocIds.size} document
+                {selectedDocIds.size !== 1 ? "s" : ""}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 mr-2">
+            <div className="flex gap-1 mr-2">
               {selectedFormats.map((f) => {
                 const fo = FORMAT_OPTIONS.find((x) => x.id === f);
                 return (
@@ -1470,36 +1427,53 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
           <div className="border-b-2 border-foreground pb-4 mb-4">
             <h1 className="text-xl font-bold">DDiQ Due Diligence Report</h1>
             <p className="text-lg font-semibold text-muted-foreground mt-1">
-              {DEMO_REPORT.projectName}
+              {rd.projectName}
             </p>
             <div className="flex items-center gap-6 mt-3 text-xs text-muted-foreground">
-              <span>Prepared for: {DEMO_REPORT.preparedFor}</span>
-              <span>By: {DEMO_REPORT.preparedBy}</span>
-              <span>Date: {DEMO_REPORT.date}</span>
+              <span>For: {rd.preparedFor}</span>
+              <span>By: {rd.preparedBy}</span>
+              <span>Date: {rd.date}</span>
             </div>
           </div>
+
+          {rd.analyzedDocuments.length > 0 && (
+            <div className="mb-6 p-3 rounded-lg bg-muted/30 border border-border/30">
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2">
+                Analyzed Documents ({rd.analyzedDocuments.length})
+              </h4>
+              <div className="flex flex-wrap gap-1.5">
+                {rd.analyzedDocuments.map((n) => (
+                  <span
+                    key={n}
+                    className="text-xs px-2 py-1 rounded bg-primary/10 text-primary font-medium"
+                  >
+                    {n}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-6">
             {visSec.map((sec) => (
               <AusgabeblattTable key={sec.id} section={sec} />
             ))}
             {activeSections.includes("statusmap") && (
-              <StatusMap statuses={DEMO_REPORT.weaStatuses} />
+              <StatusMap statuses={rd.weaStatuses} />
             )}
             {activeSections.includes("findings") && (
-              <FindingsTable findings={DEMO_REPORT.findings} />
+              <FindingsTable findings={rd.findings} />
             )}
           </div>
           <div className="mt-8 pt-4 border-t border-border/40 text-[11px] text-muted-foreground">
-            This report was auto-generated by the LAI Due Diligence System based
-            on the DDiQ v1 framework. Contents do not substitute individual
-            legal or financial review.
+            Auto-generated by LAI · DDiQ v1. Does not substitute legal review.
           </div>
         </div>
       </div>
     );
   }
 
-  // ═════════ STEP: EXPORTING ════════════════════════════════════════════════
+  // ═══════════ STEP 4: EXPORTING ══════════════════════════════════════════
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -1513,11 +1487,9 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
         >
           ← Preview
         </Button>
-        <div>
-          <h2 className="text-lg font-semibold">
-            {exportDone ? "Report Ready" : "Generating Report..."}
-          </h2>
-        </div>
+        <h2 className="text-lg font-semibold">
+          {exportDone ? "Report Ready" : "Generating Report..."}
+        </h2>
       </div>
 
       <Card className="bg-card/50 backdrop-blur border-border/50">
@@ -1534,7 +1506,7 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
                   </h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     {selectedPreset.name} · {activeSections.length} sections ·{" "}
-                    {selectedFormats.map((f) => f.toUpperCase()).join(", ")}
+                    {selectedDocIds.size} documents
                   </p>
                 </div>
                 <div>
@@ -1558,21 +1530,16 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
                     {DEMO_REPORT.projectName} — {selectedPreset.name}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {activeSections.length} sections ·{" "}
-                    {DEMO_REPORT.weaStatuses.length} WEA locations ·{" "}
-                    {DEMO_REPORT.findings.length} action items
+                    {selectedDocIds.size} documents · {activeSections.length}{" "}
+                    sections · {DEMO_REPORT.findings.length} action items
                   </p>
                 </div>
-
-                {/* Download all */}
                 {selectedFormats.length > 1 && (
                   <Button onClick={handleDownloadAll} className="shadow-sm">
                     <DownloadIcon className="w-4 h-4 mr-2" />
                     Download All ({selectedFormats.length} files)
                   </Button>
                 )}
-
-                {/* Individual format buttons */}
                 <div className="flex justify-center gap-2 flex-wrap">
                   {selectedFormats.map((fmt) => {
                     const fo = FORMAT_OPTIONS.find((x) => x.id === fmt)!;
@@ -1591,9 +1558,8 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
                     );
                   })}
                 </div>
-
                 <div className="flex justify-center gap-3 pt-2">
-                  <Button variant="outline" size="sm" onClick={resetToList}>
+                  <Button variant="outline" size="sm" onClick={resetToStart}>
                     Back to Overview
                   </Button>
                   <Button

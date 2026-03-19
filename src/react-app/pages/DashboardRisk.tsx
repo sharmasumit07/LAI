@@ -38,6 +38,8 @@ import {
 import ReportDownloadPanel from "@/react-app/components/ReportDownloadPanel";
 import type { DocumentItem } from "@/react-app/components/ReportDownloadPanel";
 
+// ─── Types ──────────────────────────────────────────────────────────────────
+
 interface RiskArea {
   id: string;
   name: string;
@@ -79,6 +81,9 @@ const riskCfg = {
     bgI: "bg-rose-500/20",
   },
 };
+
+// ─── Demo Data ──────────────────────────────────────────────────────────────
+// Same documents as DashboardDocumentsPage — later replace with shared state/context
 
 const DOCUMENTS: DocumentItem[] = [
   {
@@ -197,6 +202,8 @@ const RISKS: RiskArea[] = [
   },
 ];
 
+// ─── Component ──────────────────────────────────────────────────────────────
+
 export default function DashboardRiskPage() {
   const [tab, setTab] = useState<"assessment" | "reports">("assessment");
   const [search, setSearch] = useState("");
@@ -247,6 +254,7 @@ export default function DashboardRiskPage() {
           </TabsTrigger>
         </TabsList>
 
+        {/* Risk Assessment Tab */}
         <TabsContent value="assessment" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="bg-card/50 backdrop-blur border-border/50">
@@ -483,6 +491,7 @@ export default function DashboardRiskPage() {
           </Card>
         </TabsContent>
 
+        {/* DDiQ Reports Tab — passes documents as props */}
         <TabsContent value="reports" className="mt-6">
           <ReportDownloadPanel documents={DOCUMENTS} />
         </TabsContent>
