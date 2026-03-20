@@ -34,7 +34,6 @@ import {
   type DDiQReportData,
   type AusgabeblattSection,
   type WEAStatus,
-  type InfraPoint,
   type DocumentItem,
   type ReportPreset,
   type ExportFormat,
@@ -345,8 +344,12 @@ function generateHTML(d: DDiQReportData, a: string[]): string {
     .filter((p) => p.type !== "cable_start")
     .map((p) => {
       const emoji =
-        { substation: "⚡", cable_end: "⚡", access_road: "🛤️" }[p.type] ||
-        "📍";
+        {
+          substation: "⚡",
+          cable_start: "🔌",
+          cable_end: "⚡",
+          access_road: "🛤️",
+        }[p.type] || "📍";
       const bg =
         p.type === "substation" || p.type === "cable_end"
           ? "#6366f1"
