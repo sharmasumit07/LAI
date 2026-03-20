@@ -25,462 +25,20 @@ import {
 } from "@/react-app/components/icons";
 import { Input } from "@/react-app/components/ui/input";
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// TYPES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Matches the Document type in DashboardDocumentsPage exactly
-export interface DocumentItem {
-  id: string;
-  name: string;
-  size: number;
-  uploadDate: string;
-  type: string;
-  status: "analyzed" | "pending" | "archived";
-  category: string;
-}
-
-type Ampel = "green" | "yellow" | "red";
-
-interface AusgabeblattRow {
-  label: string;
-  value: string;
-  ampel?: Ampel;
-  note?: string;
-}
-interface AusgabeblattSection {
-  id: string;
-  title: string;
-  rows: AusgabeblattRow[];
-}
-interface WEAStatus {
-  name: string;
-  ampel: Ampel;
-  owner: string;
-  parcel: string;
-  contract: string;
-}
-interface DDiQReportData {
-  projectName: string;
-  preparedBy: string;
-  preparedFor: string;
-  date: string;
-  sections: AusgabeblattSection[];
-  weaStatuses: WEAStatus[];
-  findings: { domain: string; severity: Ampel; text: string }[];
-  analyzedDocuments: string[];
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// DEMO DATA
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const DEMO_REPORT: DDiQReportData = {
-  projectName: "Windpark Nordheide",
-  preparedBy: "LAI Due Diligence System",
-  preparedFor: "Nordheide Invest GmbH & Co. KG",
-  date: new Date().toLocaleDateString("en-US", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }),
-  analyzedDocuments: [],
-  sections: [
-    {
-      id: "overview",
-      title: "Project Overview",
-      rows: [
-        { label: "Project Name", value: "Windpark Nordheide" },
-        {
-          label: "Location",
-          value: "District of Harburg, Lower Saxony, Germany",
-        },
-        {
-          label: "Project Status",
-          value: "Under Permit Review (BImSchG application filed)",
-        },
-        { label: "Project Type", value: "Greenfield" },
-        { label: "Number of WEA", value: "8 Wind Turbines" },
-        { label: "Type & Capacity", value: "Vestas V162 – 6.2 MW per unit" },
-        { label: "Total Capacity", value: "49.6 MW" },
-        { label: "Project Company", value: "Nordheide Wind GmbH" },
-        {
-          label: "Investors",
-          value: "Nordheide Invest GmbH & Co. KG, HansaWind AG",
-        },
-        {
-          label: "Grid Connection",
-          value: "Substation Tostedt, 4.2 km cable route",
-        },
-        {
-          label: "Wind Priority Zone",
-          value: "Yes – per Regional Plan (RROP) Harburg 2021",
-        },
-      ],
-    },
-    {
-      id: "land",
-      title: "Land Security & Ownership",
-      rows: [
-        {
-          label: "Usage Contracts",
-          value: "6 of 8 locations secured (75%)",
-          ampel: "yellow",
-        },
-        {
-          label: "Land Registry",
-          value: "4 easements registered (50%)",
-          ampel: "yellow",
-        },
-        {
-          label: "Buffer Zone Security",
-          value: "Partially secured – 2 areas open",
-          ampel: "yellow",
-        },
-        {
-          label: "Cable Route",
-          value: "100% secured – agreement with municipality of Tostedt",
-          ampel: "green",
-        },
-        { label: "Access Roads", value: "100% secured", ampel: "green" },
-        {
-          label: "Contract Error Rate",
-          value: "2 contracts with missing signatures, 1 inconsistent parcel",
-          ampel: "red",
-          note: "Renegotiation required for 3 contracts",
-        },
-        {
-          label: "Contracts Reviewed",
-          value: "12 contracts (8 usage, 2 cable, 2 access)",
-        },
-        {
-          label: "Contracting Entity",
-          value: "All with Nordheide Wind GmbH – consistent",
-          ampel: "green",
-        },
-      ],
-    },
-    {
-      id: "permits",
-      title: "Permits & Regulatory Conditions",
-      rows: [
-        {
-          label: "BImSchG Permit",
-          value: "Applied Sep 12, 2024 – decision pending",
-          ampel: "yellow",
-        },
-        {
-          label: "Environmental Impact",
-          value: "EIA completed – no objections",
-          ampel: "green",
-        },
-        {
-          label: "Species Protection",
-          value: "Red kite shutdown required (Apr–Aug)",
-          ampel: "yellow",
-          note: "BioConsult 2024 report available",
-        },
-        {
-          label: "Noise & Shadow",
-          value: "Conditions met – CUBE Engineering",
-          ampel: "green",
-        },
-        {
-          label: "Authority Consultations",
-          value: "12 consulted, 11 clear, 1 follow-up (heritage)",
-          ampel: "yellow",
-        },
-        {
-          label: "Recurring Inspections",
-          value: "N/A (new installation)",
-          ampel: "green",
-        },
-      ],
-    },
-    {
-      id: "economics",
-      title: "Economics & Operations",
-      rows: [
-        {
-          label: "Feed-in Tariff",
-          value: "EEG 2023 – 7.35 ct/kWh awarded",
-          ampel: "green",
-        },
-        {
-          label: "PPA",
-          value: "PPA with EnBW until 2040, 8.1 ct/kWh",
-          ampel: "green",
-        },
-        {
-          label: "Profitability",
-          value: "IRR 7.2% at P75 – bankable",
-          ampel: "green",
-        },
-        {
-          label: "Financing",
-          value: "KfW IPEX + NordLB, term sheet signed",
-          ampel: "green",
-        },
-        {
-          label: "Securities",
-          value: "Land charges registered, bank guarantee €2.4M",
-          ampel: "green",
-        },
-        {
-          label: "Operations",
-          value: "Deutsche Windtechnik AG",
-          ampel: "green",
-        },
-        {
-          label: "Maintenance",
-          value: "Vestas full-service 15yr, 97% availability",
-          ampel: "green",
-        },
-        {
-          label: "Insurance",
-          value: "Allianz Wind Energy Policy incl. revenue loss",
-          ampel: "green",
-        },
-        { label: "Open Liability", value: "None known", ampel: "green" },
-      ],
-    },
-  ],
-  weaStatuses: [
-    {
-      name: "WEA 1",
-      ampel: "green",
-      owner: "Hofmann, Heinrich",
-      parcel: "Plot 12/4",
-      contract: "UC-2024-001, signed",
-    },
-    {
-      name: "WEA 2",
-      ampel: "green",
-      owner: "Meier, Anna",
-      parcel: "Plot 12/7",
-      contract: "UC-2024-002, signed",
-    },
-    {
-      name: "WEA 3",
-      ampel: "green",
-      owner: "Municipality of Tostedt",
-      parcel: "Plot 14/1",
-      contract: "UC-2024-003, signed",
-    },
-    {
-      name: "WEA 4",
-      ampel: "green",
-      owner: "Kroeger, Thomas",
-      parcel: "Plot 15/2",
-      contract: "UC-2024-004, signed",
-    },
-    {
-      name: "WEA 5",
-      ampel: "green",
-      owner: "Lueders, Karin",
-      parcel: "Plot 15/8",
-      contract: "UC-2024-005, signed",
-    },
-    {
-      name: "WEA 6",
-      ampel: "yellow",
-      owner: "Schmidt Estate (heirs)",
-      parcel: "Plot 16/3",
-      contract: "Draft sent, awaiting response",
-    },
-    {
-      name: "WEA 7",
-      ampel: "yellow",
-      owner: "Petersen, Jens",
-      parcel: "Plot 17/1",
-      contract: "Under negotiation – fee dispute",
-    },
-    {
-      name: "WEA 8",
-      ampel: "red",
-      owner: "Unknown (heir investigation)",
-      parcel: "Plot 18/5",
-      contract: "No contract – owner unidentified",
-    },
-  ],
-  findings: [
-    {
-      domain: "Land Security",
-      severity: "red",
-      text: "WEA 8 (Plot 18/5): Owner not identified. Heir investigation via probate court recommended.",
-    },
-    {
-      domain: "Land Security",
-      severity: "red",
-      text: "3 usage contracts have defects: missing signatures (2x), inconsistent parcel ID (1x).",
-    },
-    {
-      domain: "Land Security",
-      severity: "yellow",
-      text: "WEA 6 & 7: Contract signing pending. Deadline Q1 2025 recommended.",
-    },
-    {
-      domain: "Permits",
-      severity: "yellow",
-      text: "BImSchG decision still outstanding. Permit expected Q2 2025.",
-    },
-    {
-      domain: "Permits",
-      severity: "yellow",
-      text: "Heritage protection: Follow-up request for sightline assessment.",
-    },
-    {
-      domain: "Permits",
-      severity: "yellow",
-      text: "Red kite shutdown reduces expected yield by ~1.8%.",
-    },
-    {
-      domain: "Economics",
-      severity: "green",
-      text: "Financing secured, PPA long-term, maintenance fully covered.",
-    },
-  ],
-};
-
-// Presets
-interface ReportPreset {
-  id: string;
-  name: string;
-  description: string;
-  sections: string[];
-  estimatedPages: string;
-}
-const PRESETS: ReportPreset[] = [
-  {
-    id: "full",
-    name: "Full DDiQ Report",
-    description: "All tables, status map, and action items",
-    sections: [
-      "overview",
-      "land",
-      "permits",
-      "economics",
-      "statusmap",
-      "findings",
-    ],
-    estimatedPages: "12–18",
-  },
-  {
-    id: "executive",
-    name: "Executive Summary",
-    description: "Overview, risk summary, status map",
-    sections: ["overview", "statusmap", "findings"],
-    estimatedPages: "4–6",
-  },
-  {
-    id: "land",
-    name: "Land Security Audit",
-    description: "Contracts, land registry, traffic-light map",
-    sections: ["overview", "land", "statusmap", "findings"],
-    estimatedPages: "8–10",
-  },
-  {
-    id: "permit",
-    name: "Permit & Compliance",
-    description: "BImSchG, environment, authority consultations",
-    sections: ["overview", "permits", "findings"],
-    estimatedPages: "6–8",
-  },
-  {
-    id: "economics",
-    name: "Economic Review",
-    description: "EEG/PPA, financing, operations, insurance",
-    sections: ["overview", "economics", "findings"],
-    estimatedPages: "6–8",
-  },
-];
-
-// Export formats
-type ExportFormat = "pdf" | "docx" | "html" | "xlsx" | "csv" | "txt";
-interface FormatOption {
-  id: ExportFormat;
-  label: string;
-  description: string;
-  colorCls: string;
-}
-const FORMAT_OPTIONS: FormatOption[] = [
-  {
-    id: "pdf",
-    label: "PDF",
-    description: "Print-ready, fixed layout",
-    colorCls:
-      "text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/30",
-  },
-  {
-    id: "docx",
-    label: "DOCX",
-    description: "Editable Word document",
-    colorCls:
-      "text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/30",
-  },
-  {
-    id: "html",
-    label: "HTML",
-    description: "Interactive, shareable",
-    colorCls:
-      "text-violet-600 dark:text-violet-400 bg-violet-500/10 border-violet-500/30",
-  },
-  {
-    id: "xlsx",
-    label: "XLSX",
-    description: "Spreadsheet for analysis",
-    colorCls:
-      "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
-  },
-  {
-    id: "csv",
-    label: "CSV",
-    description: "Plain data, any tool",
-    colorCls:
-      "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30",
-  },
-  {
-    id: "txt",
-    label: "TXT",
-    description: "Plain text, lightweight",
-    colorCls:
-      "text-slate-600 dark:text-slate-400 bg-slate-500/10 border-slate-500/30",
-  },
-];
-
-// Section metadata
-const SECTION_META = [
-  {
-    id: "overview",
-    label: "Project Overview",
-    desc: "Name, location, WEA specs, companies",
-  },
-  {
-    id: "land",
-    label: "Land Security & Ownership",
-    desc: "Contracts, land registry, error rate",
-  },
-  {
-    id: "permits",
-    label: "Permits & Conditions",
-    desc: "BImSchG, EIA, species protection",
-  },
-  {
-    id: "economics",
-    label: "Economics & Operations",
-    desc: "EEG, PPA, financing, maintenance",
-  },
-  {
-    id: "statusmap",
-    label: "Status Map (Traffic Light)",
-    desc: "Green / Yellow / Red per WEA",
-  },
-  {
-    id: "findings",
-    label: "Action Items & Recommendations",
-    desc: "Prioritized issues and risks",
-  },
-];
+import {
+  DEMO_REPORT,
+  PRESETS,
+  FORMAT_OPTIONS,
+  SECTION_META,
+  type Ampel,
+  type DDiQReportData,
+  type AusgabeblattSection,
+  type WEAStatus,
+  type InfraPoint,
+  type DocumentItem,
+  type ReportPreset,
+  type ExportFormat,
+} from "@/react-app/lib/ddiqDemoData";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UI HELPERS
@@ -536,6 +94,8 @@ const AmpelBadge = ({ status }: { status: Ampel }) => {
   );
 };
 
+// ── Ausgabeblatt Table ──────────────────────────────────────────────────────
+
 const AusgabeblattTable = ({ section }: { section: AusgabeblattSection }) => (
   <div className="rounded-lg border border-border/60 overflow-hidden">
     <div className="bg-slate-50 dark:bg-slate-800/60 px-4 py-2.5 border-b border-border/40">
@@ -563,6 +123,8 @@ const AusgabeblattTable = ({ section }: { section: AusgabeblattSection }) => (
     </div>
   </div>
 );
+
+// ── Status Map (traffic-light cards) ────────────────────────────────────────
 
 const StatusMap = ({ statuses }: { statuses: WEAStatus[] }) => {
   const c = {
@@ -621,6 +183,8 @@ const StatusMap = ({ statuses }: { statuses: WEAStatus[] }) => {
   );
 };
 
+// ── Findings ────────────────────────────────────────────────────────────────
+
 const FindingsTable = ({
   findings,
 }: {
@@ -647,6 +211,24 @@ const FindingsTable = ({
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LOCATION MAP — Uses ProjectLocationMap (react-leaflet) for preview,
+//                static SVG for downloaded exports
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import ProjectLocationMap from "@/react-app/components/ProjectLocationMap";
+
+const AMPEL_HEX: Record<Ampel, string> = {
+  green: "#059669",
+  yellow: "#d97706",
+  red: "#dc2626",
+};
+const AMPEL_LABEL: Record<Ampel, string> = {
+  green: "Secured",
+  yellow: "Partial",
+  red: "Open",
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // REPORT GENERATORS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -656,46 +238,214 @@ function generateHTML(d: DDiQReportData, a: string[]): string {
     ({ green: "#059669", yellow: "#d97706", red: "#dc2626" })[x];
   const al = (x: Ampel) =>
     ({ green: "Secured", yellow: "Partial", red: "Open" })[x];
+
   const secH = secs
     .map(
       (s) =>
-        `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">${s.title}</h2><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;width:220px;">Category</th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;">Status / Details</th></tr></thead><tbody>${s.rows.map((r) => `<tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:500;vertical-align:top;">${r.label}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${r.ampel ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ac(r.ampel)};margin-right:6px;vertical-align:middle;"></span>` : ""}${r.value}${r.note ? `<br><em style="color:#d97706;font-size:12px;">${r.note}</em>` : ""}</td></tr>`).join("")}</tbody></table>`,
+        `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">${s.title}</h2>` +
+        `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;">` +
+        `<th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;width:220px;">Category</th>` +
+        `<th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;">Status / Details</th></tr></thead><tbody>` +
+        s.rows
+          .map(
+            (r) =>
+              `<tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:500;vertical-align:top;">${r.label}</td>` +
+              `<td style="padding:8px 12px;border:1px solid #e2e8f0;">${r.ampel ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ac(r.ampel)};margin-right:6px;vertical-align:middle;"></span>` : ""}${r.value}${r.note ? `<br><em style="color:#d97706;font-size:12px;">${r.note}</em>` : ""}</td></tr>`,
+          )
+          .join("") +
+        `</tbody></table>`,
     )
     .join("");
+
   const docList =
     d.analyzedDocuments.length > 0
       ? `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Analyzed Documents</h2><ul style="font-size:13px;color:#475569;">${d.analyzedDocuments.map((n) => `<li style="margin:4px 0;">${n}</li>`).join("")}</ul>`
       : "";
+
   const mapH = a.includes("statusmap")
-    ? `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Land Security Status Map</h2><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;"><th style="padding:8px 12px;border:1px solid #e2e8f0;">WEA</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Status</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Owner</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Parcel</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Contract</th></tr></thead><tbody>${d.weaStatuses.map((w) => `<tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">${w.name}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ac(w.ampel)};margin-right:6px;vertical-align:middle;"></span>${al(w.ampel)}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.owner}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.parcel}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.contract}</td></tr>`).join("")}</tbody></table>`
+    ? `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Land Security Status Map</h2>` +
+      `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;">` +
+      `<th style="padding:8px 12px;border:1px solid #e2e8f0;">WEA</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Status</th>` +
+      `<th style="padding:8px 12px;border:1px solid #e2e8f0;">Owner</th><th style="padding:8px 12px;border:1px solid #e2e8f0;">Parcel</th>` +
+      `<th style="padding:8px 12px;border:1px solid #e2e8f0;">Contract</th></tr></thead><tbody>` +
+      d.weaStatuses
+        .map(
+          (w) =>
+            `<tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">${w.name}</td>` +
+            `<td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ac(w.ampel)};margin-right:6px;vertical-align:middle;"></span>${al(w.ampel)}</td>` +
+            `<td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.owner}</td>` +
+            `<td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.parcel}</td>` +
+            `<td style="padding:8px 12px;border:1px solid #e2e8f0;">${w.contract}</td></tr>`,
+        )
+        .join("") +
+      `</tbody></table>`
     : "";
+
+  // ── Location Map: full interactive Leaflet for HTML export ──
+  const hasLocMap = a.includes("locationmap");
+  const leafletHead = hasLocMap
+    ? `<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>` +
+      `<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>`
+    : "";
+  const locH = hasLocMap
+    ? (() => {
+        const center = {
+          lat:
+            d.weaStatuses.reduce((s, w) => s + w.lat, 0) / d.weaStatuses.length,
+          lng:
+            d.weaStatuses.reduce((s, w) => s + w.lng, 0) / d.weaStatuses.length,
+        };
+        const cableStart = d.infrastructure.find(
+          (p) => p.type === "cable_start",
+        );
+        const cableEnd = d.infrastructure.find((p) => p.type === "cable_end");
+        return (
+          `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Project Location Map</h2>` +
+          `<div id="ddiq-map" style="width:100%;height:480px;border-radius:10px;border:1px solid #cbd5e1;margin-bottom:16px;"></div>` +
+          `<script>
+(function(){
+  var map = L.map('ddiq-map', { zoomControl: true }).setView([${center.lat}, ${center.lng}], 14);
+  var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 });
+  var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri World Imagery', maxZoom: 18 });
+  var topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: '© OpenTopoMap', maxZoom: 17 });
+  street.addTo(map);
+  L.control.layers({ 'Street Map': street, 'Satellite': satellite, 'Topographic': topo }, {}, { position: 'topright' }).addTo(map);
+
+  var ampelColor = { green: '#059669', yellow: '#d97706', red: '#dc2626' };
+  var ampelLabel = { green: 'Secured', yellow: 'Partial', red: 'Open' };
+
+  ${d.weaStatuses
+    .map(
+      (w) => `
+  (function(){
+    var c = '${AMPEL_HEX[w.ampel]}';
+    var icon = L.divIcon({ className: '', iconSize: [32,32], iconAnchor: [16,16], popupAnchor: [0,-18],
+      html: '<div style="width:32px;height:32px;position:relative;">'
+        + '<div style="position:absolute;inset:0;background:' + c + ';border:2.5px solid #1e293b;border-radius:50%;box-shadow:0 2px 8px ' + c + '66,0 0 0 4px ' + c + '22;display:flex;align-items:center;justify-content:center;">'
+        + '<span style="color:white;font-size:10px;font-weight:800;font-family:system-ui;">${w.name.replace("WEA ", "T")}</span></div></div>'
+    });
+    L.marker([${w.lat},${w.lng}], { icon: icon }).addTo(map).bindPopup(
+      '<div style="font-family:system-ui;min-width:220px;line-height:1.6;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f1f5f9;">'
+      + '<span style="width:10px;height:10px;border-radius:50%;background:${AMPEL_HEX[w.ampel]};border:1.5px solid #1e293b;"></span>'
+      + '<strong style="font-size:14px;">${w.name}</strong>'
+      + '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:${AMPEL_HEX[w.ampel]}18;color:${AMPEL_HEX[w.ampel]};">${AMPEL_LABEL[w.ampel]}</span></div>'
+      + '<div style="font-size:12px;color:#475569;">'
+      + '<div><b style="color:#1e293b;">Owner:</b> ${w.owner}</div>'
+      + '<div><b style="color:#1e293b;">Parcel:</b> ${w.parcel}</div>'
+      + '<div><b style="color:#1e293b;">Address:</b> ${w.address}</div>'
+      + '<div><b style="color:#1e293b;">Contract:</b> ${w.contract}</div></div>'
+      + '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;">${w.lat.toFixed(5)}°N, ${w.lng.toFixed(5)}°E</div></div>'
+    ).bindTooltip('${w.name} — ${AMPEL_LABEL[w.ampel]}', { direction: 'top', offset: [0,-18] });
+  })();`,
+    )
+    .join("\n")}
+
+  ${d.infrastructure
+    .filter((p) => p.type !== "cable_start")
+    .map((p) => {
+      const emoji =
+        { substation: "⚡", cable_end: "⚡", access_road: "🛤️" }[p.type] ||
+        "📍";
+      const bg =
+        p.type === "substation" || p.type === "cable_end"
+          ? "#6366f1"
+          : "#64748b";
+      return `(function(){
+    var icon = L.divIcon({ className: '', iconSize: [30,30], iconAnchor: [15,15], popupAnchor: [0,-15],
+      html: '<div style="width:30px;height:30px;background:${bg}22;border:2px solid ${bg};border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.2);">${emoji}</div>'
+    });
+    L.marker([${p.lat},${p.lng}], { icon: icon }).addTo(map).bindPopup('<b>${p.name}</b><br><span style="color:#64748b;font-size:12px;">${p.type.replace(/_/g, " ")}</span><br><span style="color:#94a3b8;font-size:11px;">${p.lat.toFixed(5)}°N, ${p.lng.toFixed(5)}°E</span>');
+  })();`;
+    })
+    .join("\n")}
+
+  ${cableStart && cableEnd ? `L.polyline([[${cableStart.lat},${cableStart.lng}],[${cableEnd.lat},${cableEnd.lng}]], { color: '#6366f1', weight: 3, dashArray: '10 6', opacity: 0.8 }).addTo(map).bindPopup('<b>Cable Route</b><br><span style="color:#64748b;">4.2 km to Substation Tostedt</span>');` : ""}
+
+  var legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function() {
+    var d = L.DomUtil.create('div');
+    d.innerHTML = '<div style="background:white;padding:12px 16px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.15);font-family:system-ui;min-width:160px;border:1px solid #e2e8f0;">'
+      + '<div style="font-weight:700;font-size:12px;color:#1e293b;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f1f5f9;">${d.projectName}</div>'
+      + '<div style="display:flex;flex-direction:column;gap:5px;font-size:11px;color:#475569;">'
+      + '<div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;border-radius:50%;background:#059669;border:1.5px solid #1e293b;flex-shrink:0;"></span>Secured</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;border-radius:50%;background:#d97706;border:1.5px solid #1e293b;flex-shrink:0;"></span>In Negotiation</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;border-radius:50%;background:#dc2626;border:1.5px solid #1e293b;flex-shrink:0;"></span>Open Issues</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-top:2px;padding-top:5px;border-top:1px solid #f1f5f9;"><span style="width:10px;height:2px;background:#6366f1;flex-shrink:0;"></span>Cable Route</div>'
+      + '</div></div>';
+    return d;
+  };
+  legend.addTo(map);
+
+  var bounds = L.latLngBounds([${d.weaStatuses.map((w) => `[${w.lat},${w.lng}]`).join(",")}]);
+  map.fitBounds(bounds.pad(0.15));
+})();
+<\/script>` +
+          `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;">` +
+          `<thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">WEA</th><th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Lat</th><th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Lng</th><th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Address</th><th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Status</th></tr></thead>` +
+          `<tbody>${d.weaStatuses.map((w) => `<tr><td style="padding:6px 10px;border:1px solid #e2e8f0;font-weight:600;">${w.name}</td><td style="padding:6px 10px;border:1px solid #e2e8f0;">${w.lat.toFixed(4)}</td><td style="padding:6px 10px;border:1px solid #e2e8f0;">${w.lng.toFixed(4)}</td><td style="padding:6px 10px;border:1px solid #e2e8f0;">${w.address}</td><td style="padding:6px 10px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ac(w.ampel)};margin-right:4px;vertical-align:middle;"></span>${al(w.ampel)}</td></tr>`).join("")}</tbody></table>`
+        );
+      })()
+    : "";
+
   const findH = a.includes("findings")
-    ? `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Action Items</h2><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;"><th style="width:24px;border:1px solid #e2e8f0;padding:8px;"></th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;width:140px;">Domain</th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;">Recommendation</th></tr></thead><tbody>${d.findings.map((f) => `<tr><td style="text-align:center;padding:8px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ac(f.severity)};"></span></td><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:500;">${f.domain}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">${f.text}</td></tr>`).join("")}</tbody></table>`
+    ? `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Action Items</h2>` +
+      `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;">` +
+      `<th style="width:24px;border:1px solid #e2e8f0;padding:8px;"></th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;width:140px;">Domain</th><th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;">Recommendation</th></tr></thead><tbody>` +
+      d.findings
+        .map(
+          (f) =>
+            `<tr><td style="text-align:center;padding:8px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ac(f.severity)};"></span></td>` +
+            `<td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:500;">${f.domain}</td>` +
+            `<td style="padding:8px 12px;border:1px solid #e2e8f0;">${f.text}</td></tr>`,
+        )
+        .join("") +
+      `</tbody></table>`
     : "";
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>DDiQ Report – ${d.projectName}</title><style>@media print{body{font-size:12px}h1{font-size:18px}h2{font-size:14px}table{page-break-inside:avoid}}</style></head><body style="max-width:900px;margin:40px auto;padding:0 24px;font-family:system-ui,-apple-system,sans-serif;color:#1e293b;line-height:1.5;"><div style="border-bottom:3px solid #1e293b;padding-bottom:16px;margin-bottom:32px;"><h1 style="font-size:22px;font-weight:800;margin:0;">DDiQ Due Diligence Report</h1><p style="font-size:18px;font-weight:600;color:#475569;margin:4px 0 0;">${d.projectName}</p><div style="display:flex;gap:24px;margin-top:12px;font-size:12px;color:#64748b;"><span>Prepared for: ${d.preparedFor}</span><span>By: ${d.preparedBy}</span><span>Date: ${d.date}</span></div></div>${docList}${secH}${mapH}${findH}<div style="margin-top:40px;padding-top:16px;border-top:2px solid #e2e8f0;font-size:11px;color:#94a3b8;">Auto-generated by LAI · DDiQ v1. Does not substitute legal review.</div></body></html>`;
+
+  return (
+    `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>DDiQ Report – ${d.projectName}</title>` +
+    `${leafletHead}` +
+    `<style>@media print{body{font-size:12px}h1{font-size:18px}h2{font-size:14px}table{page-break-inside:avoid}#ddiq-map{height:360px!important}.leaflet-control-layers,.leaflet-control-zoom{display:none!important}}</style></head>` +
+    `<body style="max-width:900px;margin:40px auto;padding:0 24px;font-family:system-ui,-apple-system,sans-serif;color:#1e293b;line-height:1.5;">` +
+    `<div style="border-bottom:3px solid #1e293b;padding-bottom:16px;margin-bottom:32px;">` +
+    `<h1 style="font-size:22px;font-weight:800;margin:0;">DDiQ Due Diligence Report</h1>` +
+    `<p style="font-size:18px;font-weight:600;color:#475569;margin:4px 0 0;">${d.projectName}</p>` +
+    `<div style="display:flex;gap:24px;margin-top:12px;font-size:12px;color:#64748b;">` +
+    `<span>Prepared for: ${d.preparedFor}</span><span>By: ${d.preparedBy}</span><span>Date: ${d.date}</span></div></div>` +
+    `${docList}${secH}${mapH}${locH}${findH}` +
+    `<div style="margin-top:40px;padding-top:16px;border-top:2px solid #e2e8f0;font-size:11px;color:#94a3b8;">Auto-generated by LAI · DDiQ v1. Does not substitute legal review.</div>` +
+    `</body></html>`
+  );
 }
 
 function generateCSV(d: DDiQReportData, a: string[]): string {
-  const l = ["Section,Category,Value,Status"];
+  const l = ["Section,Category,Value,Status,Latitude,Longitude"];
   d.sections
     .filter((s) => a.includes(s.id))
     .forEach((s) =>
       s.rows.forEach((r) =>
         l.push(
-          `"${s.title}","${r.label}","${r.value.replace(/"/g, '""')}","${r.ampel || ""}"`,
+          `"${s.title}","${r.label}","${r.value.replace(/"/g, '""')}","${r.ampel || ""}","",""`,
         ),
       ),
     );
   if (a.includes("statusmap"))
     d.weaStatuses.forEach((w) =>
       l.push(
-        `"Status Map","${w.name}","Owner: ${w.owner} | Parcel: ${w.parcel} | Contract: ${w.contract}","${w.ampel}"`,
+        `"Status Map","${w.name}","Owner: ${w.owner} | Parcel: ${w.parcel} | Contract: ${w.contract}","${w.ampel}","${w.lat}","${w.lng}"`,
+      ),
+    );
+  if (a.includes("locationmap"))
+    d.weaStatuses.forEach((w) =>
+      l.push(
+        `"Location Map","${w.name}","${w.address}","${w.ampel}","${w.lat}","${w.lng}"`,
       ),
     );
   if (a.includes("findings"))
     d.findings.forEach((f) =>
       l.push(
-        `"Action Items","${f.domain}","${f.text.replace(/"/g, '""')}","${f.severity}"`,
+        `"Action Items","${f.domain}","${f.text.replace(/"/g, '""')}","${f.severity}","",""`,
       ),
     );
   return l.join("\n");
@@ -742,6 +492,24 @@ function generateTXT(d: DDiQReportData, a: string[]): string {
     d.weaStatuses.forEach((w) =>
       l.push(
         `  [${w.ampel.toUpperCase().padEnd(6)}] ${w.name}  |  ${w.owner}  |  ${w.parcel}  |  ${w.contract}`,
+      ),
+    );
+  }
+  if (a.includes("locationmap")) {
+    l.push(
+      "",
+      "--- LOCATION MAP (COORDINATES) ────────────────────────────────────",
+      "",
+    );
+    d.weaStatuses.forEach((w) =>
+      l.push(
+        `  ${w.name.padEnd(8)} ${w.lat.toFixed(4)}°N, ${w.lng.toFixed(4)}°E  |  ${w.address}  [${w.ampel.toUpperCase()}]`,
+      ),
+    );
+    l.push("", "  Infrastructure:");
+    d.infrastructure.forEach((p) =>
+      l.push(
+        `  ${p.name.padEnd(28)} ${p.lat.toFixed(4)}°N, ${p.lng.toFixed(4)}°E`,
       ),
     );
   }
@@ -822,17 +590,19 @@ interface Props {
   className?: string;
 }
 
-export default function ReportDownloadPanel({ documents, className }: Props) {
+export default function ReportDownloadPanel({
+  documents: rawDocs,
+  className,
+}: Props) {
+  // Guard: if caller passes undefined/null explicitly, default param won't catch it
+  const documents = rawDocs ?? [];
   const analyzedDocs = useMemo(
     () => documents.filter((d) => d.status === "analyzed"),
     [documents],
   );
 
-  // Document selection
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [docSearch, setDocSearch] = useState("");
-
-  // Wizard
   const [step, setStep] = useState<Step>("select-docs");
   const [selectedPreset, setSelectedPreset] = useState<ReportPreset>(
     PRESETS[0],
@@ -881,7 +651,6 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
     },
   };
 
-  // Actions
   const toggleDoc = (id: string) =>
     setSelectedDocIds((prev) => {
       const n = new Set(prev);
@@ -911,6 +680,10 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
     setStep("select-docs");
     setExportDone(false);
   };
+  const getReportData = (): DDiQReportData => ({
+    ...DEMO_REPORT,
+    analyzedDocuments: selectedDocs.map((d) => d.name),
+  });
 
   const doExport = () => {
     setStep("exporting");
@@ -926,11 +699,6 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
       } else setExportProgress(Math.min(p, 98));
     }, 300);
   };
-
-  const getReportData = (): DDiQReportData => ({
-    ...DEMO_REPORT,
-    analyzedDocuments: selectedDocs.map((d) => d.name),
-  });
 
   const handleDownloadAll = () => {
     const rd = getReportData();
@@ -1013,7 +781,6 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
           </Card>
         </div>
 
-        {/* Document selection */}
         <Card className="bg-card/50 backdrop-blur border-border/50">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -1114,7 +881,6 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
               </div>
             )}
 
-            {/* Pending/archived shown as disabled */}
             {documents.filter((d) => d.status !== "analyzed").length > 0 && (
               <>
                 <Separator className="my-4" />
@@ -1200,7 +966,6 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
           </div>
         </div>
 
-        {/* Presets */}
         <Card className="bg-card/50 backdrop-blur border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">
@@ -1239,11 +1004,10 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
           </CardContent>
         </Card>
 
-        {/* Sections */}
         <Card className="bg-card/50 backdrop-blur border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">
-              Customize Sections ({activeSections.length}/6)
+              Customize Sections ({activeSections.length}/{SECTION_META.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -1289,7 +1053,6 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
           </CardContent>
         </Card>
 
-        {/* Formats */}
         <Card className="bg-card/50 backdrop-blur border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">
@@ -1444,6 +1207,13 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
             {activeSections.includes("statusmap") && (
               <StatusMap statuses={rd.weaStatuses} />
             )}
+            {activeSections.includes("locationmap") && (
+              <ProjectLocationMap
+                statuses={rd.weaStatuses}
+                infrastructure={rd.infrastructure}
+                projectName={rd.projectName}
+              />
+            )}
             {activeSections.includes("findings") && (
               <FindingsTable findings={rd.findings} />
             )}
@@ -1474,7 +1244,6 @@ export default function ReportDownloadPanel({ documents, className }: Props) {
           {exportDone ? "Report Ready" : "Generating Report..."}
         </h2>
       </div>
-
       <Card className="bg-card/50 backdrop-blur border-border/50">
         <CardContent className="py-12">
           <div className="max-w-md mx-auto text-center space-y-6">

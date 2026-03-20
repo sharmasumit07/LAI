@@ -36,7 +36,6 @@ import {
   DownloadIcon,
 } from "@/react-app/components/icons";
 import ReportDownloadPanel from "@/react-app/components/ReportDownloadPanel";
-import type { DocumentItem } from "@/react-app/components/ReportDownloadPanel";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -51,6 +50,55 @@ interface RiskArea {
   flaggedItems: number;
   lastUpdated: string;
 }
+
+// Documents — same data as DashboardDocumentsPage
+const DOCUMENTS = [
+  {
+    id: "1",
+    name: "permit_application_2024.pdf",
+    size: 2.4,
+    uploadDate: "2024-02-18",
+    type: "PDF",
+    status: "analyzed" as const,
+    category: "Permits",
+  },
+  {
+    id: "2",
+    name: "land_lease_agreement.docx",
+    size: 1.1,
+    uploadDate: "2024-02-15",
+    type: "Word",
+    status: "analyzed" as const,
+    category: "Legal",
+  },
+  {
+    id: "3",
+    name: "environmental_impact_report.pdf",
+    size: 5.8,
+    uploadDate: "2024-02-14",
+    type: "PDF",
+    status: "analyzed" as const,
+    category: "Environmental",
+  },
+  {
+    id: "4",
+    name: "technical_specifications.xlsx",
+    size: 0.8,
+    uploadDate: "2024-02-10",
+    type: "Excel",
+    status: "pending" as const,
+    category: "Technical",
+  },
+  {
+    id: "5",
+    name: "grid_connection_procedure.pdf",
+    size: 3.2,
+    uploadDate: "2024-02-08",
+    type: "PDF",
+    status: "archived" as const,
+    category: "Grid",
+  },
+];
 
 const riskCfg = {
   low: {
@@ -84,54 +132,6 @@ const riskCfg = {
 
 // ─── Demo Data ──────────────────────────────────────────────────────────────
 // Same documents as DashboardDocumentsPage — later replace with shared state/context
-
-const DOCUMENTS: DocumentItem[] = [
-  {
-    id: "1",
-    name: "permit_application_2024.pdf",
-    size: 2.4,
-    uploadDate: "2024-02-18",
-    type: "PDF",
-    status: "analyzed",
-    category: "Permits",
-  },
-  {
-    id: "2",
-    name: "land_lease_agreement.docx",
-    size: 1.1,
-    uploadDate: "2024-02-15",
-    type: "Word",
-    status: "analyzed",
-    category: "Legal",
-  },
-  {
-    id: "3",
-    name: "environmental_impact_report.pdf",
-    size: 5.8,
-    uploadDate: "2024-02-14",
-    type: "PDF",
-    status: "analyzed",
-    category: "Environmental",
-  },
-  {
-    id: "4",
-    name: "technical_specifications.xlsx",
-    size: 0.8,
-    uploadDate: "2024-02-10",
-    type: "Excel",
-    status: "pending",
-    category: "Technical",
-  },
-  {
-    id: "5",
-    name: "grid_connection_procedure.pdf",
-    size: 3.2,
-    uploadDate: "2024-02-08",
-    type: "PDF",
-    status: "archived",
-    category: "Grid",
-  },
-];
 
 const RISKS: RiskArea[] = [
   {
