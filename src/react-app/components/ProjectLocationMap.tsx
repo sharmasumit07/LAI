@@ -1,17 +1,6 @@
 "use client";
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ProjectLocationMap — Interactive map using react-leaflet
-//
-// Install required packages:
-//   npm install leaflet react-leaflet
-//   npm install -D @types/leaflet
-//
-// Add to your global CSS (index.css or globals.css):
-//   @import "leaflet/dist/leaflet.css";
-// ═══════════════════════════════════════════════════════════════════════════════
-
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -29,8 +18,6 @@ import type {
   WEAStatus,
   InfraPoint,
 } from "@/react-app/lib/ddiqDemoData";
-
-// Fix Leaflet default icon path issue in bundlers
 import "leaflet/dist/leaflet.css";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -40,72 +27,61 @@ const AMPEL_HEX: Record<Ampel, string> = {
   yellow: "#d97706",
   red: "#dc2626",
 };
-
 const AMPEL_LABEL: Record<Ampel, string> = {
   green: "Secured",
   yellow: "Partial",
   red: "Open",
 };
-
 const AMPEL_BG: Record<Ampel, string> = {
   green: "bg-emerald-500",
   yellow: "bg-amber-500",
   red: "bg-rose-500",
 };
 
-// ─── Custom icon builder ────────────────────────────────────────────────────
+// ─── Custom WEA icon ────────────────────────────────────────────────────────
 
 function createWEAIcon(ampel: Ampel, label: string): L.DivIcon {
-  const color = AMPEL_HEX[ampel];
+  const c = AMPEL_HEX[ampel];
   return L.divIcon({
     className: "",
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -18],
-    html: `<div style="position:relative;width:32px;height:32px;">
-      <div style="
-        position:absolute;inset:0;
-        background:${color};
-        border:2.5px solid #1e293b;
-        border-radius:50%;
-        box-shadow:0 2px 8px ${color}66, 0 0 0 4px ${color}22;
-        display:flex;align-items:center;justify-content:center;
-      ">
-        <span style="color:white;font-size:10px;font-weight:800;font-family:system-ui;letter-spacing:-0.5px;">${label}</span>
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16],
+    html: `<div style="width:28px;height:28px;position:relative;">
+      <div style="position:absolute;inset:0;background:${c};border:2px solid #fff;border-radius:50%;
+        box-shadow:0 1px 4px ${c}88,0 0 0 1.5px #1e293b33;
+        display:flex;align-items:center;justify-content:center;">
+        <span style="color:#fff;font-size:9px;font-weight:800;font-family:system-ui;">${label}</span>
       </div>
     </div>`,
   });
 }
 
+// ─── Custom infrastructure icon ─────────────────────────────────────────────
+
 function createInfraIcon(type: InfraPoint["type"]): L.DivIcon {
-  const config: Record<
+  const cfg: Record<
     InfraPoint["type"],
-    { emoji: string; bg: string; border: string; size: number }
+    { emoji: string; bg: string; size: number }
   > = {
-    substation: { emoji: "⚡", bg: "#6366f1", border: "#4f46e5", size: 30 },
-    cable_start: { emoji: "🔌", bg: "#8b5cf6", border: "#7c3aed", size: 24 },
-    cable_end: { emoji: "⚡", bg: "#6366f1", border: "#4f46e5", size: 30 },
-    access_road: { emoji: "🛤️", bg: "#64748b", border: "#475569", size: 26 },
+    substation: { emoji: "⚡", bg: "#6366f1", size: 28 },
+    cable_start: { emoji: "🔌", bg: "#8b5cf6", size: 22 },
+    cable_end: { emoji: "⚡", bg: "#6366f1", size: 28 },
+    access_road: { emoji: "🛤️", bg: "#64748b", size: 24 },
   };
-  const c = config[type];
+  const c = cfg[type];
   return L.divIcon({
     className: "",
     iconSize: [c.size, c.size],
     iconAnchor: [c.size / 2, c.size / 2],
     popupAnchor: [0, -c.size / 2],
-    html: `<div style="
-      width:${c.size}px;height:${c.size}px;
-      background:${c.bg}22;
-      border:2px solid ${c.border};
-      border-radius:6px;
-      display:flex;align-items:center;justify-content:center;
-      font-size:${c.size * 0.5}px;
-      box-shadow:0 2px 6px rgba(0,0,0,0.2);
-    ">${c.emoji}</div>`,
+    html: `<div style="width:${c.size}px;height:${c.size}px;background:${c.bg}20;border:1.5px solid ${c.bg};
+      border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:${c.size * 0.45}px;
+      box-shadow:0 1px 4px rgba(0,0,0,0.15);">${c.emoji}</div>`,
   });
 }
 
-// ─── Auto-fit bounds helper ─────────────────────────────────────────────────
+// ─── Map helpers (child components that use useMap hook) ─────────────────────
 
 function FitBounds({
   statuses,
@@ -116,23 +92,48 @@ function FitBounds({
 }) {
   const map = useMap();
   const fitted = useRef(false);
-
   useEffect(() => {
     if (fitted.current) return;
-    const points: L.LatLngExpression[] = [
+    const pts: L.LatLngExpression[] = [
       ...statuses.map((w) => [w.lat, w.lng] as L.LatLngExpression),
       ...infra.map((p) => [p.lat, p.lng] as L.LatLngExpression),
     ];
-    if (points.length > 0) {
-      map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 15 });
+    if (pts.length > 0) {
+      map.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: 15 });
       fitted.current = true;
     }
   }, [map, statuses, infra]);
-
   return null;
 }
 
-// ─── Legend control ──────────────────────────────────────────────────────────
+function ScrollZoomController({ active }: { active: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (active) map.scrollWheelZoom.enable();
+    else map.scrollWheelZoom.disable();
+  }, [map, active]);
+  return null;
+}
+
+function ZoomControl() {
+  const map = useMap();
+  useEffect(() => {
+    const ctrl = L.control.zoom({ position: "bottomleft" });
+    ctrl.addTo(map);
+    return () => {
+      ctrl.remove();
+    };
+  }, [map]);
+  return null;
+}
+
+function CleanAttribution() {
+  const map = useMap();
+  useEffect(() => {
+    map.attributionControl.setPrefix(false);
+  }, [map]);
+  return null;
+}
 
 function LegendControl({
   statuses,
@@ -142,71 +143,47 @@ function LegendControl({
   projectName: string;
 }) {
   const map = useMap();
-
   useEffect(() => {
     const legend = new L.Control({ position: "bottomright" });
-
     legend.onAdd = () => {
       const div = L.DomUtil.create("div");
-      const counts = {
-        green: statuses.filter((s) => s.ampel === "green").length,
-        yellow: statuses.filter((s) => s.ampel === "yellow").length,
-        red: statuses.filter((s) => s.ampel === "red").length,
-      };
-      div.innerHTML = `
-        <div style="background:white;padding:12px 16px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.15);font-family:system-ui;min-width:160px;border:1px solid #e2e8f0;">
-          <div style="font-weight:700;font-size:12px;color:#1e293b;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f1f5f9;">${projectName}</div>
-          <div style="display:flex;flex-direction:column;gap:5px;font-size:11px;color:#475569;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="width:10px;height:10px;border-radius:50%;background:#059669;border:1.5px solid #1e293b;flex-shrink:0;"></span>
-              Secured (${counts.green})
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="width:10px;height:10px;border-radius:50%;background:#d97706;border:1.5px solid #1e293b;flex-shrink:0;"></span>
-              In Negotiation (${counts.yellow})
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="width:10px;height:10px;border-radius:50%;background:#dc2626;border:1.5px solid #1e293b;flex-shrink:0;"></span>
-              Open Issues (${counts.red})
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:2px;padding-top:5px;border-top:1px solid #f1f5f9;">
-              <span style="width:10px;height:2px;background:#6366f1;flex-shrink:0;border-radius:1px;"></span>
-              Cable Route
-            </div>
-          </div>
+      const g = statuses.filter((s) => s.ampel === "green").length;
+      const y = statuses.filter((s) => s.ampel === "yellow").length;
+      const r = statuses.filter((s) => s.ampel === "red").length;
+      div.innerHTML = `<div style="background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);padding:10px 14px;border-radius:8px;
+        box-shadow:0 2px 12px rgba(0,0,0,0.1);font-family:system-ui;font-size:10px;color:#475569;line-height:1.8;border:1px solid #e2e8f0;">
+        <div style="font-weight:700;font-size:11px;color:#1e293b;margin-bottom:4px;">${projectName}</div>
+        <div style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#059669;"></span>Secured (${g})</div>
+        <div style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#d97706;"></span>Negotiation (${y})</div>
+        <div style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#dc2626;"></span>Open (${r})</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:3px;padding-top:3px;border-top:1px solid #f1f5f9;">
+          <span style="width:8px;height:2px;background:#6366f1;border-radius:1px;"></span>Cable Route
         </div>
-      `;
+      </div>`;
       return div;
     };
-
     legend.addTo(map);
     return () => {
       legend.remove();
     };
   }, [map, statuses, projectName]);
-
   return null;
 }
 
-// ─── Tile layer URLs ────────────────────────────────────────────────────────
+// ─── Tile layer config ──────────────────────────────────────────────────────
 
-const TILE_LAYERS = {
+const TILES = {
   street: {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    name: "Street Map",
+    attr: "© OpenStreetMap",
   },
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution:
-      '&copy; <a href="https://www.esri.com">Esri</a> &mdash; World Imagery',
-    name: "Satellite",
+    attr: "© Esri",
   },
   topo: {
     url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-    attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
-    name: "Topographic",
+    attr: "© OpenTopoMap",
   },
 };
 
@@ -214,7 +191,7 @@ const TILE_LAYERS = {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-interface ProjectLocationMapProps {
+interface Props {
   statuses: WEAStatus[];
   infrastructure: InfraPoint[];
   projectName: string;
@@ -226,21 +203,21 @@ export default function ProjectLocationMap({
   infrastructure,
   projectName,
   className,
-}: ProjectLocationMapProps) {
-  // Calculate center from all points
+}: Props) {
+  const [mapActive, setMapActive] = useState(false);
+
   const center: [number, number] = [
     statuses.reduce((s, w) => s + w.lat, 0) / (statuses.length || 1),
     statuses.reduce((s, w) => s + w.lng, 0) / (statuses.length || 1),
   ];
 
-  // Cable route coordinates
-  const cableStart = infrastructure.find((p) => p.type === "cable_start");
-  const cableEnd = infrastructure.find((p) => p.type === "cable_end");
+  const cStart = infrastructure.find((p) => p.type === "cable_start");
+  const cEnd = infrastructure.find((p) => p.type === "cable_end");
   const cableRoute: [number, number][] =
-    cableStart && cableEnd
+    cStart && cEnd
       ? [
-          [cableStart.lat, cableStart.lng],
-          [cableEnd.lat, cableEnd.lng],
+          [cStart.lat, cStart.lng],
+          [cEnd.lat, cEnd.lng],
         ]
       : [];
 
@@ -250,6 +227,8 @@ export default function ProjectLocationMap({
     red: statuses.filter((s) => s.ampel === "red").length,
   };
 
+  const handleMouseLeave = useCallback(() => setMapActive(false), []);
+
   return (
     <div
       className={cn(
@@ -257,245 +236,251 @@ export default function ProjectLocationMap({
         className,
       )}
     >
-      {/* Header */}
-      <div className="bg-slate-50 dark:bg-slate-800/60 px-4 py-2.5 border-b border-border/40 flex items-center justify-between">
-        <h4 className="text-sm font-semibold">Project Location Map</h4>
-        <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />{" "}
-            {counts.green} Secured
+      {/* ── Header ── */}
+      <div className="bg-slate-50 dark:bg-slate-800/60 px-4 py-2 border-b border-border/40 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">Project Location Map</span>
+          <span className="text-[9px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted font-medium uppercase tracking-wide">
+            Interactive
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />{" "}
-            {counts.yellow} Partial
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            {counts.green}
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />{" "}
-            {counts.red} Open
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+            {counts.yellow}
           </span>
-          <span>
-            {statuses.length} WEA · {infrastructure.length} Infra
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
+            {counts.red}
           </span>
+          <span className="text-muted-foreground/40">|</span>
+          <span>{statuses.length} WEA</span>
         </div>
       </div>
 
-      {/* Map */}
-      <MapContainer
-        center={center}
-        zoom={14}
-        scrollWheelZoom={true}
-        style={{ height: "480px", width: "100%" }}
-        zoomControl={true}
+      {/* ── Map ── */}
+      <div
+        className="relative"
+        onClick={() => setMapActive(true)}
+        onMouseLeave={handleMouseLeave}
       >
-        {/* Layer switcher: Street / Satellite / Topo */}
-        <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name={TILE_LAYERS.street.name}>
-            <TileLayer
-              url={TILE_LAYERS.street.url}
-              attribution={TILE_LAYERS.street.attribution}
-              maxZoom={19}
-            />
-          </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name={TILE_LAYERS.satellite.name}>
-            <TileLayer
-              url={TILE_LAYERS.satellite.url}
-              attribution={TILE_LAYERS.satellite.attribution}
-              maxZoom={18}
-            />
-          </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name={TILE_LAYERS.topo.name}>
-            <TileLayer
-              url={TILE_LAYERS.topo.url}
-              attribution={TILE_LAYERS.topo.attribution}
-              maxZoom={17}
-            />
-          </LayersControl.BaseLayer>
-        </LayersControl>
+        {/* Leaflet style overrides — scoped via nesting */}
+        <style>{`
+          .plm-container .leaflet-control-attribution { font-size: 9px; opacity: 0.6; }
+          .plm-container .leaflet-control-attribution a { color: #64748b; }
+          .plm-container .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+          .plm-container .leaflet-popup-content { margin: 10px 12px; }
+          .plm-container .leaflet-popup-close-button { font-size: 16px; color: #94a3b8; padding: 6px 8px 0 0; }
+          .plm-container .leaflet-control-layers { border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .plm-container .leaflet-control-layers-toggle { width: 32px; height: 32px; background-size: 18px; }
+          .plm-container .leaflet-control-zoom a { width: 30px; height: 30px; line-height: 30px; font-size: 14px; color: #475569; }
+          .plm-container .leaflet-control-zoom { border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .plm-container .wea-label-tooltip { background: transparent; border: none; box-shadow: none; font-size: 9px; font-weight: 700; color: #1e293b; padding: 0; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 6px #fff; }
+          .plm-container .wea-label-tooltip::before { display: none; }
+        `}</style>
 
-        {/* Auto-fit all markers */}
-        <FitBounds statuses={statuses} infra={infrastructure} />
-
-        {/* Legend */}
-        <LegendControl statuses={statuses} projectName={projectName} />
-
-        {/* Cable route */}
-        {cableRoute.length === 2 && (
-          <Polyline
-            positions={cableRoute}
-            pathOptions={{
-              color: "#6366f1",
-              weight: 3,
-              dashArray: "10 6",
-              opacity: 0.8,
-            }}
+        <div className="plm-container">
+          <MapContainer
+            center={center}
+            zoom={14}
+            scrollWheelZoom={false}
+            zoomControl={false}
+            style={{ height: "420px", width: "100%" }}
           >
-            <Popup>
-              <div style={{ fontFamily: "system-ui", fontSize: "13px" }}>
-                <strong>Cable Route</strong>
-                <br />
-                <span style={{ color: "#64748b" }}>
-                  4.2 km to Substation Tostedt
-                </span>
-              </div>
-            </Popup>
-          </Polyline>
-        )}
+            <CleanAttribution />
+            <ScrollZoomController active={mapActive} />
+            <FitBounds statuses={statuses} infra={infrastructure} />
+            <LegendControl statuses={statuses} projectName={projectName} />
+            <ZoomControl />
 
-        {/* Infrastructure markers */}
-        {infrastructure
-          .filter((p) => p.type !== "cable_start")
-          .map((p) => (
-            <Marker
-              key={p.name}
-              position={[p.lat, p.lng]}
-              icon={createInfraIcon(p.type)}
-            >
-              <Popup>
-                <div
-                  style={{
-                    fontFamily: "system-ui",
-                    fontSize: "13px",
-                    minWidth: "140px",
-                  }}
-                >
-                  <strong>{p.name}</strong>
-                  <br />
-                  <span style={{ color: "#64748b", fontSize: "12px" }}>
-                    {p.type
-                      .replace(/_/g, " ")
-                      .replace(/\b\w/g, (c) => c.toUpperCase())}
-                  </span>
-                  <br />
-                  <span style={{ color: "#94a3b8", fontSize: "11px" }}>
-                    {p.lat.toFixed(5)}°N, {p.lng.toFixed(5)}°E
-                  </span>
-                </div>
-              </Popup>
-              <LeafletTooltip
-                direction="top"
-                offset={[0, -14]}
-                permanent={false}
-              >
-                {p.name}
-              </LeafletTooltip>
-            </Marker>
-          ))}
+            <LayersControl position="topright" collapsed={true}>
+              <LayersControl.BaseLayer checked name="Street">
+                <TileLayer
+                  url={TILES.street.url}
+                  attribution={TILES.street.attr}
+                  maxZoom={19}
+                />
+              </LayersControl.BaseLayer>
+              <LayersControl.BaseLayer name="Satellite">
+                <TileLayer
+                  url={TILES.satellite.url}
+                  attribution={TILES.satellite.attr}
+                  maxZoom={18}
+                />
+              </LayersControl.BaseLayer>
+              <LayersControl.BaseLayer name="Topographic">
+                <TileLayer
+                  url={TILES.topo.url}
+                  attribution={TILES.topo.attr}
+                  maxZoom={17}
+                />
+              </LayersControl.BaseLayer>
+            </LayersControl>
 
-        {/* WEA markers */}
-        {statuses.map((w) => (
-          <Marker
-            key={w.name}
-            position={[w.lat, w.lng]}
-            icon={createWEAIcon(w.ampel, w.name.replace("WEA ", "T"))}
-          >
-            <Popup>
-              <div
-                style={{
-                  fontFamily: "system-ui",
-                  fontSize: "13px",
-                  minWidth: "220px",
-                  lineHeight: "1.6",
+            {/* Cable route */}
+            {cableRoute.length === 2 && (
+              <Polyline
+                positions={cableRoute}
+                pathOptions={{
+                  color: "#6366f1",
+                  weight: 3,
+                  dashArray: "10 6",
+                  opacity: 0.75,
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "8px",
-                    paddingBottom: "6px",
-                    borderBottom: "1px solid #f1f5f9",
-                  }}
+                <Popup>
+                  <div style={{ fontFamily: "system-ui", fontSize: "12px" }}>
+                    <strong>Cable Route</strong>
+                    <br />
+                    <span style={{ color: "#64748b" }}>
+                      4.2 km → Substation Tostedt
+                    </span>
+                  </div>
+                </Popup>
+              </Polyline>
+            )}
+
+            {/* Infrastructure */}
+            {infrastructure
+              .filter((p) => p.type !== "cable_start")
+              .map((p) => (
+                <Marker
+                  key={p.name}
+                  position={[p.lat, p.lng]}
+                  icon={createInfraIcon(p.type)}
                 >
-                  <span
+                  <Popup>
+                    <div style={{ fontFamily: "system-ui", fontSize: "12px" }}>
+                      <strong>{p.name}</strong>
+                      <br />
+                      <span style={{ color: "#94a3b8", fontSize: "11px" }}>
+                        {p.lat.toFixed(5)}°N, {p.lng.toFixed(5)}°E
+                      </span>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+
+            {/* WEA turbines */}
+            {statuses.map((w) => (
+              <Marker
+                key={w.name}
+                position={[w.lat, w.lng]}
+                icon={createWEAIcon(w.ampel, w.name.replace("WEA ", "T"))}
+              >
+                <Popup>
+                  <div
                     style={{
-                      width: "10px",
-                      height: "10px",
-                      borderRadius: "50%",
-                      background: AMPEL_HEX[w.ampel],
-                      border: "1.5px solid #1e293b",
-                      flexShrink: 0,
-                    }}
-                  />
-                  <strong style={{ fontSize: "14px" }}>{w.name}</strong>
-                  <span
-                    style={{
-                      fontSize: "10px",
-                      fontWeight: 600,
-                      padding: "2px 8px",
-                      borderRadius: "4px",
-                      background: `${AMPEL_HEX[w.ampel]}18`,
-                      color: AMPEL_HEX[w.ampel],
+                      fontFamily: "system-ui",
+                      fontSize: "12px",
+                      minWidth: "200px",
+                      lineHeight: 1.6,
                     }}
                   >
-                    {AMPEL_LABEL[w.ampel]}
-                  </span>
-                </div>
-                <div style={{ fontSize: "12px", color: "#475569" }}>
-                  <div>
-                    <span style={{ fontWeight: 600, color: "#1e293b" }}>
-                      Owner:
-                    </span>{" "}
-                    {w.owner}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        paddingBottom: "6px",
+                        marginBottom: "6px",
+                        borderBottom: "1px solid #f1f5f9",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: AMPEL_HEX[w.ampel],
+                          flexShrink: 0,
+                        }}
+                      />
+                      <strong style={{ fontSize: "13px" }}>{w.name}</strong>
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          fontWeight: 700,
+                          padding: "1px 6px",
+                          borderRadius: "3px",
+                          background: `${AMPEL_HEX[w.ampel]}15`,
+                          color: AMPEL_HEX[w.ampel],
+                        }}
+                      >
+                        {AMPEL_LABEL[w.ampel]}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#475569" }}>
+                      <div>
+                        <b style={{ color: "#1e293b" }}>Owner:</b> {w.owner}
+                      </div>
+                      <div>
+                        <b style={{ color: "#1e293b" }}>Parcel:</b> {w.parcel}
+                      </div>
+                      <div>
+                        <b style={{ color: "#1e293b" }}>Address:</b> {w.address}
+                      </div>
+                      <div>
+                        <b style={{ color: "#1e293b" }}>Contract:</b>{" "}
+                        {w.contract}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: "5px",
+                        paddingTop: "5px",
+                        borderTop: "1px solid #f1f5f9",
+                        fontSize: "10px",
+                        color: "#94a3b8",
+                      }}
+                    >
+                      {w.lat.toFixed(5)}°N, {w.lng.toFixed(5)}°E
+                    </div>
                   </div>
-                  <div>
-                    <span style={{ fontWeight: 600, color: "#1e293b" }}>
-                      Parcel:
-                    </span>{" "}
-                    {w.parcel}
-                  </div>
-                  <div>
-                    <span style={{ fontWeight: 600, color: "#1e293b" }}>
-                      Address:
-                    </span>{" "}
-                    {w.address}
-                  </div>
-                  <div>
-                    <span style={{ fontWeight: 600, color: "#1e293b" }}>
-                      Contract:
-                    </span>{" "}
-                    {w.contract}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    marginTop: "6px",
-                    paddingTop: "6px",
-                    borderTop: "1px solid #f1f5f9",
-                    fontSize: "11px",
-                    color: "#94a3b8",
-                  }}
+                </Popup>
+                <LeafletTooltip
+                  direction="top"
+                  offset={[0, -16]}
+                  permanent
+                  className="wea-label-tooltip"
                 >
-                  {w.lat.toFixed(5)}°N, {w.lng.toFixed(5)}°E
-                </div>
-              </div>
-            </Popup>
-            <LeafletTooltip direction="top" offset={[0, -18]} permanent={false}>
-              {w.name} — {AMPEL_LABEL[w.ampel]}
-            </LeafletTooltip>
-          </Marker>
-        ))}
-      </MapContainer>
+                  {w.name}
+                </LeafletTooltip>
+              </Marker>
+            ))}
+          </MapContainer>
+        </div>
 
-      {/* Coordinate reference below map */}
+        {/* "Click to interact" overlay */}
+        {!mapActive && (
+          <div className="absolute inset-0 z-[1000] flex items-end justify-center pb-4 pointer-events-none">
+            <div className="bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium px-3 py-1.5 rounded-full shadow-lg animate-pulse">
+              Click to enable zoom & pan
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Coordinates ── */}
       <div className="border-t border-border/40">
-        <div className="px-4 py-2.5 bg-slate-50/50 dark:bg-slate-800/30">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Turbine Coordinates
+        <div className="px-4 py-2 bg-slate-50/50 dark:bg-slate-800/30">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+            Coordinates
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1">
             {statuses.map((w) => (
               <div
                 key={w.name}
                 className="flex items-center gap-1.5 text-[11px]"
               >
                 <span
-                  className={cn(
-                    "w-2 h-2 rounded-full inline-block",
-                    AMPEL_BG[w.ampel],
-                  )}
+                  className={cn("w-1.5 h-1.5 rounded-full", AMPEL_BG[w.ampel])}
                 />
-                <span className="font-semibold">{w.name}</span>
+                <span className="font-medium">{w.name}</span>
                 <span className="text-muted-foreground">
                   {w.lat.toFixed(4)}°, {w.lng.toFixed(4)}°
                 </span>
