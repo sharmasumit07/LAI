@@ -214,13 +214,13 @@ const FindingsTable = ({
 // ── Cadastral Parcel Table (preview) ────────────────────────────────────────
 
 const CadastralTable = ({ parcels }: { parcels: CadastralParcel[] }) => {
-  // const byStatus = {
-  //   secured: parcels.filter((p) => p.status === "secured"),
-  //   negotiation: parcels.filter((p) => p.status === "negotiation"),
-  //   open: parcels.filter((p) => p.status === "open"),
-  //   buffer: parcels.filter((p) => p.status === "buffer"),
-  //   easement: parcels.filter((p) => p.status === "easement"),
-  // };
+  const byStatus = {
+    secured: parcels.filter((p) => p.status === "secured"),
+    negotiation: parcels.filter((p) => p.status === "negotiation"),
+    open: parcels.filter((p) => p.status === "open"),
+    buffer: parcels.filter((p) => p.status === "buffer"),
+    easement: parcels.filter((p) => p.status === "easement"),
+  };
   const totalArea = parcels.reduce((s, p) => s + p.area, 0);
   const securedArea = parcels
     .filter(
@@ -421,8 +421,9 @@ function generateHTML(d: DDiQReportData, a: string[]): string {
         `</tbody></table>`
       : "";
 
-  // ── Location Map: full interactive Leaflet for HTML export ──
+  // ── Location Map: full interactive Leaflet with Turbines/Parcels toggle ──
   const hasLocMap = a.includes("locationmap");
+  const hasCadast = a.includes("cadastralmap") && d.parcels.length > 0;
   const leafletHead = hasLocMap
     ? `<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>` +
       `<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>`
@@ -439,47 +440,49 @@ function generateHTML(d: DDiQReportData, a: string[]): string {
           (p) => p.type === "cable_start",
         );
         const cableEnd = d.infrastructure.find((p) => p.type === "cable_end");
+
+        // Parcel colors for JS
+        const PCS: Record<string, string> = {
+          secured: "#059669",
+          negotiation: "#d97706",
+          open: "#dc2626",
+          buffer: "#3b82f6",
+          easement: "#8b5cf6",
+        };
+        const PCL: Record<string, string> = {
+          secured: "Secured",
+          negotiation: "In Negotiation",
+          open: "Not Secured",
+          buffer: "Buffer Zone",
+          easement: "Cable Easement",
+        };
+
+        // Toggle button HTML (only if parcels exist)
+        const toggleHTML = hasCadast
+          ? `
+      <div id="ddiq-toggle" style="display:flex;gap:0;background:#f1f5f9;border-radius:6px;padding:2px;border:1px solid #e2e8f0;margin-bottom:12px;width:fit-content;">
+        <button id="btn-turbines" onclick="switchView('turbines')" style="font:600 12px/1 system-ui;padding:7px 16px;border-radius:4px;border:none;cursor:pointer;background:#fff;color:#0f172a;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:all .15s;">Turbines</button>
+        <button id="btn-parcels" onclick="switchView('parcels')" style="font:600 12px/1 system-ui;padding:7px 16px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:#64748b;transition:all .15s;">Parcels</button>
+      </div>`
+          : "";
+
         return (
           `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Project Location Map</h2>` +
+          toggleHTML +
           `<div id="ddiq-map" style="width:100%;height:480px;border-radius:10px;border:1px solid #cbd5e1;margin-bottom:16px;"></div>` +
           `<script>
 (function(){
   var map = L.map('ddiq-map', { zoomControl: true }).setView([${center.lat}, ${center.lng}], 14);
   var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 });
-  var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri World Imagery', maxZoom: 18 });
+  var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', maxZoom: 18 });
   var topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: '© OpenTopoMap', maxZoom: 17 });
   street.addTo(map);
-  L.control.layers({ 'Street Map': street, 'Satellite': satellite, 'Topographic': topo }, {}, { position: 'topright' }).addTo(map);
+  L.control.layers({ 'Street': street, 'Satellite': satellite, 'Topographic': topo }, {}, { position: 'topright' }).addTo(map);
 
-  var ampelColor = { green: '#059669', yellow: '#d97706', red: '#dc2626' };
-  var ampelLabel = { green: 'Secured', yellow: 'Partial', red: 'Open' };
+  // ── Shared: Cable + Infrastructure ──
+  var sharedGroup = L.layerGroup().addTo(map);
 
-  ${d.weaStatuses
-    .map(
-      (w) => `
-  (function(){
-    var c = '${AMPEL_HEX[w.ampel]}';
-    var icon = L.divIcon({ className: '', iconSize: [32,32], iconAnchor: [16,16], popupAnchor: [0,-18],
-      html: '<div style="width:32px;height:32px;position:relative;">'
-        + '<div style="position:absolute;inset:0;background:' + c + ';border:2.5px solid #1e293b;border-radius:50%;box-shadow:0 2px 8px ' + c + '66,0 0 0 4px ' + c + '22;display:flex;align-items:center;justify-content:center;">'
-        + '<span style="color:white;font-size:10px;font-weight:800;font-family:system-ui;">${w.name.replace("WEA ", "T")}</span></div></div>'
-    });
-    L.marker([${w.lat},${w.lng}], { icon: icon }).addTo(map).bindPopup(
-      '<div style="font-family:system-ui;min-width:220px;line-height:1.6;">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f1f5f9;">'
-      + '<span style="width:10px;height:10px;border-radius:50%;background:${AMPEL_HEX[w.ampel]};border:1.5px solid #1e293b;"></span>'
-      + '<strong style="font-size:14px;">${w.name}</strong>'
-      + '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:${AMPEL_HEX[w.ampel]}18;color:${AMPEL_HEX[w.ampel]};">${AMPEL_LABEL[w.ampel]}</span></div>'
-      + '<div style="font-size:12px;color:#475569;">'
-      + '<div><b style="color:#1e293b;">Owner:</b> ${w.owner}</div>'
-      + '<div><b style="color:#1e293b;">Parcel:</b> ${w.parcel}</div>'
-      + '<div><b style="color:#1e293b;">Address:</b> ${w.address}</div>'
-      + '<div><b style="color:#1e293b;">Contract:</b> ${w.contract}</div></div>'
-      + '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;">${w.lat.toFixed(5)}°N, ${w.lng.toFixed(5)}°E</div></div>'
-    ).bindTooltip('${w.name} — ${AMPEL_LABEL[w.ampel]}', { direction: 'top', offset: [0,-18] });
-  })();`,
-    )
-    .join("\n")}
+  ${cableStart && cableEnd ? `L.polyline([[${cableStart.lat},${cableStart.lng}],[${cableEnd.lat},${cableEnd.lng}]], { color: '#6366f1', weight: 2.5, dashArray: '10 6', opacity: 0.7 }).addTo(sharedGroup).bindPopup('<b>Cable Route</b><br><span style="color:#64748b;">4.2 km → Substation Tostedt</span>');` : ""}
 
   ${d.infrastructure
     .filter((p) => p.type !== "cable_start")
@@ -487,44 +490,177 @@ function generateHTML(d: DDiQReportData, a: string[]): string {
       const emoji =
         {
           substation: "⚡",
-          cable_start: "🔌",
           cable_end: "⚡",
-          access_road: "🛤️",
-        }[p.type] || "📍";
+          access_road: "🛤",
+          cable_start: "·",
+        }[p.type] || "·";
       const bg =
         p.type === "substation" || p.type === "cable_end"
           ? "#6366f1"
           : "#64748b";
+      return `L.marker([${p.lat},${p.lng}], { icon: L.divIcon({ className:'', iconSize:[26,26], iconAnchor:[13,13], popupAnchor:[0,-14],
+      html:'<div style="width:26px;height:26px;background:${bg}15;border:1.5px solid ${bg};border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;">${emoji}</div>'
+    })}).addTo(sharedGroup).bindPopup('<b>${p.name}</b><br><span style="color:#94a3b8;font-size:11px;">${p.lat.toFixed(5)}°N, ${p.lng.toFixed(5)}°E</span>');`;
+    })
+    .join("\n  ")}
+
+  // ── Turbines Layer ──
+  var turbineGroup = L.layerGroup().addTo(map);
+
+  ${d.weaStatuses
+    .map((w) => {
+      const c = AMPEL_HEX[w.ampel];
       return `(function(){
-    var icon = L.divIcon({ className: '', iconSize: [30,30], iconAnchor: [15,15], popupAnchor: [0,-15],
-      html: '<div style="width:30px;height:30px;background:${bg}22;border:2px solid ${bg};border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.2);">${emoji}</div>'
+    var ic = L.divIcon({ className:'', iconSize:[30,30], iconAnchor:[15,15], popupAnchor:[0,-17],
+      html:'<div style="width:30px;height:30px;"><div style="position:absolute;inset:0;background:${c};border:2.5px solid #fff;border-radius:50%;box-shadow:0 2px 8px ${c}55;display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-size:11px;font-weight:800;font-family:system-ui;">${w.name.replace("WEA ", "")}</span></div></div>'
     });
-    L.marker([${p.lat},${p.lng}], { icon: icon }).addTo(map).bindPopup('<b>${p.name}</b><br><span style="color:#64748b;font-size:12px;">${p.type.replace(/_/g, " ")}</span><br><span style="color:#94a3b8;font-size:11px;">${p.lat.toFixed(5)}°N, ${p.lng.toFixed(5)}°E</span>');
+    L.marker([${w.lat},${w.lng}], { icon: ic }).addTo(turbineGroup)
+      .bindPopup('<div style="font:12px/1.6 system-ui;min-width:200px;padding:10px 12px;">'
+        + '<div style="display:flex;align-items:center;gap:6px;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid #f1f5f9;">'
+        + '<span style="width:9px;height:9px;border-radius:50%;background:${c};border:1.5px solid #fff;box-shadow:0 0 0 1px ${c}40;"></span>'
+        + '<strong style="font-size:13px;">${w.name}</strong>'
+        + '<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:4px;background:${c}10;color:${c};margin-left:auto;">${AMPEL_LABEL[w.ampel]}</span></div>'
+        + '<div style="font-size:11px;color:#475569;">'
+        + '<div><b style="color:#1e293b;">Owner</b> ${w.owner}</div>'
+        + '<div><b style="color:#1e293b;">Parcel</b> ${w.parcel}</div>'
+        + '<div><b style="color:#1e293b;">Address</b> ${w.address}</div>'
+        + '<div><b style="color:#1e293b;">Contract</b> ${w.contract}</div></div>'
+        + '<div style="font-size:10px;color:#94a3b8;margin-top:5px;padding-top:5px;border-top:1px solid #f1f5f9;">${w.lat.toFixed(5)}°N, ${w.lng.toFixed(5)}°E</div></div>')
+      .bindTooltip('${w.name}', { direction:'top', offset:[0,-17], permanent:true,
+        className:'plm-wea-tt' });
   })();`;
     })
-    .join("\n")}
+    .join("\n  ")}
 
-  ${cableStart && cableEnd ? `L.polyline([[${cableStart.lat},${cableStart.lng}],[${cableEnd.lat},${cableEnd.lng}]], { color: '#6366f1', weight: 3, dashArray: '10 6', opacity: 0.8 }).addTo(map).bindPopup('<b>Cable Route</b><br><span style="color:#64748b;">4.2 km to Substation Tostedt</span>');` : ""}
+  ${
+    hasCadast
+      ? `
+  // ── Parcels Layer ──
+  var parcelGroup = L.layerGroup();
 
-  var legend = L.control({ position: 'bottomright' });
-  legend.onAdd = function() {
-    var d = L.DomUtil.create('div');
-    d.innerHTML = '<div style="background:white;padding:12px 16px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.15);font-family:system-ui;min-width:160px;border:1px solid #e2e8f0;">'
-      + '<div style="font-weight:700;font-size:12px;color:#1e293b;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f1f5f9;">${d.projectName}</div>'
-      + '<div style="display:flex;flex-direction:column;gap:5px;font-size:11px;color:#475569;">'
-      + '<div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;border-radius:50%;background:#059669;border:1.5px solid #1e293b;flex-shrink:0;"></span>Secured</div>'
-      + '<div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;border-radius:50%;background:#d97706;border:1.5px solid #1e293b;flex-shrink:0;"></span>In Negotiation</div>'
-      + '<div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;border-radius:50%;background:#dc2626;border:1.5px solid #1e293b;flex-shrink:0;"></span>Open Issues</div>'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-top:2px;padding-top:5px;border-top:1px solid #f1f5f9;"><span style="width:10px;height:2px;background:#6366f1;flex-shrink:0;"></span>Cable Route</div>'
-      + '</div></div>';
-    return d;
+  ${d.parcels
+    .map((p) => {
+      const c = PCS[p.status] || "#64748b";
+      const lb = PCL[p.status] || p.status;
+      const isEasement = p.status === "easement";
+      // Find top-left corner for label
+      const tlIdx = p.polygon.reduce(
+        (bi, pt, i, arr) =>
+          pt[0] > arr[bi][0] || (pt[0] === arr[bi][0] && pt[1] < arr[bi][1])
+            ? i
+            : bi,
+        0,
+      );
+      const tl = p.polygon[tlIdx];
+      return `(function(){
+    L.polygon([${p.polygon.map((pt) => `[${pt[0]},${pt[1]}]`).join(",")}], {
+      fillColor:'${c}', fillOpacity:0.2, color:'${c}', weight:${isEasement ? 1.5 : 2.5},
+      ${isEasement ? "dashArray:'6 4'," : ""} opacity:0.9
+    }).addTo(parcelGroup).bindPopup(
+      '<div style="font:12px/1.6 system-ui;min-width:200px;padding:10px 12px;">'
+      + '<div style="display:flex;align-items:center;gap:6px;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid #f1f5f9;">'
+      + '<span style="width:9px;height:9px;border-radius:50%;background:${c};border:1.5px solid #fff;box-shadow:0 0 0 1px ${c}40;"></span>'
+      + '<strong style="font-size:13px;">Flst. ${p.parcelNumber}</strong>'
+      + '<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:4px;background:${c}10;color:${c};margin-left:auto;">${lb}</span></div>'
+      + '<div style="font-size:11px;color:#475569;">'
+      + '<div><b style="color:#1e293b;">Gemarkung</b> ${p.gemarkung}, Flur ${p.flur}</div>'
+      + '<div><b style="color:#1e293b;">Owner</b> ${p.owner}</div>'
+      + '<div><b style="color:#1e293b;">Area</b> ${p.area} ha</div>'
+      ${p.linkedWEA ? `+ '<div><b style="color:#1e293b;">Turbine</b> ${p.linkedWEA}</div>'` : ""}
+      ${p.contractRef ? `+ '<div><b style="color:#1e293b;">Contract</b> ${p.contractRef}</div>'` : ""}
+      ${p.notes ? `+ '<div style="font-size:10px;color:#94a3b8;margin-top:5px;padding-top:5px;border-top:1px solid #f1f5f9;font-style:italic;">${p.notes}</div>'` : ""}
+      + '</div></div>'
+    );
+    // Corner label
+    L.marker([${tl[0]},${tl[1]}], { interactive:false, icon: L.divIcon({ className:'', iconSize:[0,0], iconAnchor:[-4,14],
+      html:'<div style="font:800 11px/1 system-ui;color:${c};white-space:nowrap;pointer-events:none;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff,0 0 6px #fff,1px 1px 2px rgba(0,0,0,.15);">${p.parcelNumber}</div>'
+    })}).addTo(parcelGroup);
+  })();`;
+    })
+    .join("\n  ")}
+
+  // Small WEA dots in parcel view
+  ${d.weaStatuses
+    .map((w) => {
+      const c = AMPEL_HEX[w.ampel];
+      return `L.marker([${w.lat},${w.lng}], { icon: L.divIcon({ className:'', iconSize:[12,12], iconAnchor:[6,6],
+    html:'<div style="width:12px;height:12px;background:${c};border:1.5px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.25);opacity:.8;"></div>'
+  })}).addTo(parcelGroup).bindTooltip('${w.name}', { direction:'top', offset:[0,-8] });`;
+    })
+    .join("\n  ")}
+  `
+      : ""
+  }
+
+  // ── Legend ──
+  var legendCtrl = L.control({ position: 'bottomright' });
+  var currentLegend = null;
+  function buildLegend(mode) {
+    if (currentLegend) map.removeControl(currentLegend);
+    currentLegend = L.control({ position: 'bottomright' });
+    currentLegend.onAdd = function() {
+      var d = L.DomUtil.create('div');
+      var dot = function(c) { return '<span style="width:8px;height:8px;border-radius:50%;background:'+c+';flex-shrink:0;"></span>'; };
+      var sw = function(c,ds) { return '<span style="width:16px;height:8px;border-radius:2px;border:1.5px '+(ds?'dashed':'solid')+' '+c+';background:'+c+'20;flex-shrink:0;"></span>'; };
+      var row = function(i,t) { return '<div style="display:flex;align-items:center;gap:7px;padding:1px 0;">'+i+'<span>'+t+'</span></div>'; };
+      var b = '';
+      if (mode === 'turbines') {
+        b += '<div style="font-weight:600;font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Turbine Status</div>';
+        b += row(dot('#059669'), 'Secured (${d.weaStatuses.filter((w) => w.ampel === "green").length})');
+        b += row(dot('#d97706'), 'Negotiation (${d.weaStatuses.filter((w) => w.ampel === "yellow").length})');
+        b += row(dot('#dc2626'), 'Open (${d.weaStatuses.filter((w) => w.ampel === "red").length})');
+      } else {
+        b += '<div style="font-weight:600;font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Land Status</div>';
+        b += row(sw('#059669'), 'Secured');
+        b += row(sw('#d97706'), 'In Negotiation');
+        b += row(sw('#dc2626'), 'Not Secured');
+        b += row(sw('#3b82f6'), 'Buffer Zone');
+        b += row(sw('#8b5cf6',true), 'Cable Easement');
+      }
+      b += '<div style="height:1px;background:#e2e8f0;margin:4px 0;"></div>';
+      b += row('<span style="width:16px;height:0;border-top:2px dashed #6366f1;flex-shrink:0;"></span>', 'Cable Route');
+      d.innerHTML = '<div style="background:rgba(255,255,255,.96);backdrop-filter:blur(8px);padding:9px 12px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.08);border:1px solid #e2e8f0;font:10px/1.6 system-ui;color:#475569;">'+b+'</div>';
+      return d;
+    };
+    currentLegend.addTo(map);
+  }
+  buildLegend('turbines');
+
+  // ── Toggle Logic ──
+  ${
+    hasCadast
+      ? `
+  window.switchView = function(mode) {
+    var btnT = document.getElementById('btn-turbines');
+    var btnP = document.getElementById('btn-parcels');
+    if (mode === 'turbines') {
+      map.removeLayer(parcelGroup);
+      turbineGroup.addTo(map);
+      btnT.style.background = '#fff'; btnT.style.color = '#0f172a'; btnT.style.boxShadow = '0 1px 3px rgba(0,0,0,.08)';
+      btnP.style.background = 'transparent'; btnP.style.color = '#64748b'; btnP.style.boxShadow = 'none';
+    } else {
+      map.removeLayer(turbineGroup);
+      parcelGroup.addTo(map);
+      btnP.style.background = '#fff'; btnP.style.color = '#0f172a'; btnP.style.boxShadow = '0 1px 3px rgba(0,0,0,.08)';
+      btnT.style.background = 'transparent'; btnT.style.color = '#64748b'; btnT.style.boxShadow = 'none';
+    }
+    buildLegend(mode);
   };
-  legend.addTo(map);
+  `
+      : ""
+  }
 
+  // Fit bounds
   var bounds = L.latLngBounds([${d.weaStatuses.map((w) => `[${w.lat},${w.lng}]`).join(",")}]);
   map.fitBounds(bounds.pad(0.15));
+
+  // WEA tooltip style
+  var style = document.createElement('style');
+  style.textContent = '.plm-wea-tt{background:none!important;border:none!important;box-shadow:none!important;font:700 9.5px/1 system-ui;color:#0f172a;padding:0!important;text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 8px #fff}.plm-wea-tt::before{display:none}';
+  document.head.appendChild(style);
 })();
 <\/script>` +
+          // WEA coordinates table
           `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;">` +
           `<thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">WEA</th><th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Lat</th><th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Lng</th><th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Address</th><th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Status</th></tr></thead>` +
           `<tbody>${d.weaStatuses.map((w) => `<tr><td style="padding:6px 10px;border:1px solid #e2e8f0;font-weight:600;">${w.name}</td><td style="padding:6px 10px;border:1px solid #e2e8f0;">${w.lat.toFixed(4)}</td><td style="padding:6px 10px;border:1px solid #e2e8f0;">${w.lng.toFixed(4)}</td><td style="padding:6px 10px;border:1px solid #e2e8f0;">${w.address}</td><td style="padding:6px 10px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ac(w.ampel)};margin-right:4px;vertical-align:middle;"></span>${al(w.ampel)}</td></tr>`).join("")}</tbody></table>`
