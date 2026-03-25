@@ -214,13 +214,6 @@ const FindingsTable = ({
 // ── Cadastral Parcel Table (preview) ────────────────────────────────────────
 
 const CadastralTable = ({ parcels }: { parcels: CadastralParcel[] }) => {
-  const byStatus = {
-    secured: parcels.filter((p) => p.status === "secured"),
-    negotiation: parcels.filter((p) => p.status === "negotiation"),
-    open: parcels.filter((p) => p.status === "open"),
-    buffer: parcels.filter((p) => p.status === "buffer"),
-    easement: parcels.filter((p) => p.status === "easement"),
-  };
   const totalArea = parcels.reduce((s, p) => s + p.area, 0);
   const securedArea = parcels
     .filter(
