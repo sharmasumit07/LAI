@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   MapContainer,
   TileLayer,
   Polyline,
+  Polygon,
   Popup,
   Marker,
   LayersControl,
@@ -17,183 +18,304 @@ import type {
   Ampel,
   WEAStatus,
   InfraPoint,
+  CadastralParcel,
+  ParcelStatus,
 } from "@/react-app/lib/ddiqDemoData";
 import "leaflet/dist/leaflet.css";
 
-// ─── Constants ──────────────────────────────────────────────────────────────
+// ─── View Mode ──────────────────────────────────────────────────────────────
 
-const AMPEL_HEX: Record<Ampel, string> = {
-  green: "#059669",
-  yellow: "#d97706",
-  red: "#dc2626",
-};
-const AMPEL_LABEL: Record<Ampel, string> = {
-  green: "Secured",
-  yellow: "Partial",
-  red: "Open",
-};
-const AMPEL_BG: Record<Ampel, string> = {
-  green: "bg-emerald-500",
-  yellow: "bg-amber-500",
-  red: "bg-rose-500",
+type ViewMode = "turbines" | "parcels";
+
+// ─── Design Tokens ──────────────────────────────────────────────────────────
+
+const AMPEL: Record<Ampel, { hex: string; label: string; tw: string }> = {
+  green: { hex: "#059669", label: "Secured", tw: "bg-emerald-500" },
+  yellow: { hex: "#d97706", label: "Partial", tw: "bg-amber-500" },
+  red: { hex: "#dc2626", label: "Open", tw: "bg-rose-500" },
 };
 
-// ─── Custom WEA icon ────────────────────────────────────────────────────────
+const PARCEL_STYLE: Record<ParcelStatus, { color: string; label: string }> = {
+  secured: { color: "#059669", label: "Secured" },
+  negotiation: { color: "#d97706", label: "In Negotiation" },
+  open: { color: "#dc2626", label: "Not Secured" },
+  buffer: { color: "#3b82f6", label: "Buffer Zone" },
+  easement: { color: "#8b5cf6", label: "Cable Easement" },
+};
 
-function createWEAIcon(ampel: Ampel, label: string): L.DivIcon {
-  const c = AMPEL_HEX[ampel];
+// ─── Icon Factories ─────────────────────────────────────────────────────────
+
+// Full WEA marker (turbines view)
+function weaIcon(ampel: Ampel, num: string): L.DivIcon {
+  const c = AMPEL[ampel].hex;
   return L.divIcon({
     className: "",
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -16],
-    html: `<div style="width:28px;height:28px;position:relative;">
-      <div style="position:absolute;inset:0;background:${c};border:2px solid #fff;border-radius:50%;
-        box-shadow:0 1px 4px ${c}88,0 0 0 1.5px #1e293b33;
-        display:flex;align-items:center;justify-content:center;">
-        <span style="color:#fff;font-size:9px;font-weight:800;font-family:system-ui;">${label}</span>
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -17],
+    html: `<div style="width:30px;height:30px;position:relative;">
+      <div style="position:absolute;inset:0;background:${c};border:2.5px solid #fff;border-radius:50%;
+        box-shadow:0 2px 8px ${c}55;display:flex;align-items:center;justify-content:center;">
+        <span style="color:#fff;font-size:11px;font-weight:800;font-family:system-ui;">${num}</span>
       </div>
     </div>`,
   });
 }
 
-// ─── Custom infrastructure icon ─────────────────────────────────────────────
-
-function createInfraIcon(type: InfraPoint["type"]): L.DivIcon {
-  const cfg: Record<
-    InfraPoint["type"],
-    { emoji: string; bg: string; size: number }
-  > = {
-    substation: { emoji: "⚡", bg: "#6366f1", size: 28 },
-    cable_start: { emoji: "🔌", bg: "#8b5cf6", size: 22 },
-    cable_end: { emoji: "⚡", bg: "#6366f1", size: 28 },
-    access_road: { emoji: "🛤️", bg: "#64748b", size: 24 },
-  };
-  const c = cfg[type];
+// Small WEA dot (parcels view — just a position reference)
+function weaDotIcon(ampel: Ampel): L.DivIcon {
+  const c = AMPEL[ampel].hex;
   return L.divIcon({
     className: "",
-    iconSize: [c.size, c.size],
-    iconAnchor: [c.size / 2, c.size / 2],
-    popupAnchor: [0, -c.size / 2],
-    html: `<div style="width:${c.size}px;height:${c.size}px;background:${c.bg}20;border:1.5px solid ${c.bg};
-      border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:${c.size * 0.45}px;
-      box-shadow:0 1px 4px rgba(0,0,0,0.15);">${c.emoji}</div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+    popupAnchor: [0, -8],
+    html: `<div style="width:12px;height:12px;background:${c};border:1.5px solid #fff;border-radius:50%;
+      box-shadow:0 1px 3px rgba(0,0,0,.25);opacity:.8;"></div>`,
   });
 }
 
-// ─── Map helpers (child components that use useMap hook) ─────────────────────
+function infraIcon(type: InfraPoint["type"]): L.DivIcon {
+  const map: Record<InfraPoint["type"], { ch: string; bg: string }> = {
+    substation: { ch: "⚡", bg: "#6366f1" },
+    cable_start: { ch: "·", bg: "#8b5cf6" },
+    cable_end: { ch: "⚡", bg: "#6366f1" },
+    access_road: { ch: "🛤", bg: "#64748b" },
+  };
+  const { ch, bg } = map[type];
+  return L.divIcon({
+    className: "",
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -14],
+    html: `<div style="width:26px;height:26px;background:${bg}15;border:1.5px solid ${bg};border-radius:5px;
+      display:flex;align-items:center;justify-content:center;font-size:12px;
+      box-shadow:0 1px 4px rgba(0,0,0,0.12);">${ch}</div>`,
+  });
+}
 
-function FitBounds({
+// Parcel label — pinned to top-left corner of polygon
+function topLeftCorner(poly: [number, number][]): [number, number] {
+  let best = poly[0];
+  for (const pt of poly) {
+    if (pt[0] > best[0] || (pt[0] === best[0] && pt[1] < best[1])) best = pt;
+  }
+  return best;
+}
+
+function parcelLabelIcon(num: string, color: string): L.DivIcon {
+  return L.divIcon({
+    className: "",
+    iconSize: [0, 0],
+    iconAnchor: [-4, 14],
+    html: `<div style="
+      font:800 11px/1 system-ui; color:${color};
+      white-space:nowrap; pointer-events:none;
+      text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 6px #fff, 0 0 6px #fff,
+                   1px 1px 2px rgba(0,0,0,.15);
+    ">${num}</div>`,
+  });
+}
+
+// ─── Map Helpers ────────────────────────────────────────────────────────────
+
+function FitBounds({ points }: { points: L.LatLngExpression[] }) {
+  const map = useMap();
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current || points.length === 0) return;
+    map.fitBounds(L.latLngBounds(points), { padding: [50, 50], maxZoom: 15 });
+    done.current = true;
+  }, [map, points]);
+  return null;
+}
+
+function ScrollControl({ on }: { on: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    on ? map.scrollWheelZoom.enable() : map.scrollWheelZoom.disable();
+  }, [map, on]);
+  return null;
+}
+
+function SetupControls() {
+  const map = useMap();
+  useEffect(() => {
+    map.attributionControl.setPrefix(false);
+    const z = L.control.zoom({ position: "bottomleft" });
+    z.addTo(map);
+    return () => {
+      z.remove();
+    };
+  }, [map]);
+  return null;
+}
+
+// ─── Legend (adapts to active view) ─────────────────────────────────────────
+
+function MapLegend({
   statuses,
-  infra,
+  mode,
 }: {
   statuses: WEAStatus[];
-  infra: InfraPoint[];
+  mode: ViewMode;
 }) {
   const map = useMap();
-  const fitted = useRef(false);
   useEffect(() => {
-    if (fitted.current) return;
-    const pts: L.LatLngExpression[] = [
-      ...statuses.map((w) => [w.lat, w.lng] as L.LatLngExpression),
-      ...infra.map((p) => [p.lat, p.lng] as L.LatLngExpression),
-    ];
-    if (pts.length > 0) {
-      map.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: 15 });
-      fitted.current = true;
-    }
-  }, [map, statuses, infra]);
-  return null;
-}
+    const ctrl = new L.Control({ position: "bottomright" });
+    ctrl.onAdd = () => {
+      const el = L.DomUtil.create("div");
+      const dot = (c: string) =>
+        `<span style="width:8px;height:8px;border-radius:50%;background:${c};flex-shrink:0;"></span>`;
+      const swatch = (c: string, dashed = false) =>
+        `<span style="width:16px;height:8px;border-radius:2px;border:1.5px ${dashed ? "dashed" : "solid"} ${c};background:${c}20;flex-shrink:0;"></span>`;
+      const row = (icon: string, text: string) =>
+        `<div style="display:flex;align-items:center;gap:7px;padding:1px 0;">${icon}<span>${text}</span></div>`;
 
-function ScrollZoomController({ active }: { active: boolean }) {
-  const map = useMap();
-  useEffect(() => {
-    if (active) map.scrollWheelZoom.enable();
-    else map.scrollWheelZoom.disable();
-  }, [map, active]);
-  return null;
-}
+      let body = "";
 
-function ZoomControl() {
-  const map = useMap();
-  useEffect(() => {
-    const ctrl = L.control.zoom({ position: "bottomleft" });
+      if (mode === "turbines") {
+        const g = statuses.filter((s) => s.ampel === "green").length;
+        const y = statuses.filter((s) => s.ampel === "yellow").length;
+        const r = statuses.filter((s) => s.ampel === "red").length;
+        body += `<div style="font-weight:600;font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Turbine Status</div>`;
+        body += row(dot("#059669"), `Secured (${g})`);
+        body += row(dot("#d97706"), `Negotiation (${y})`);
+        body += row(dot("#dc2626"), `Open (${r})`);
+      } else {
+        body += `<div style="font-weight:600;font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Land Status</div>`;
+        body += row(swatch("#059669"), "Secured");
+        body += row(swatch("#d97706"), "In Negotiation");
+        body += row(swatch("#dc2626"), "Not Secured");
+        body += row(swatch("#3b82f6"), "Buffer Zone");
+        body += row(swatch("#8b5cf6", true), "Cable Easement");
+      }
+
+      body += `<div style="height:1px;background:#e2e8f0;margin:4px 0;"></div>`;
+      body += row(
+        `<span style="width:16px;height:0;border-top:2px dashed #6366f1;flex-shrink:0;"></span>`,
+        "Cable Route",
+      );
+
+      el.innerHTML = `<div style="background:rgba(255,255,255,.96);backdrop-filter:blur(8px);
+        padding:9px 12px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.08);
+        border:1px solid #e2e8f0;font:10px/1.6 system-ui;color:#475569;">${body}</div>`;
+      return el;
+    };
     ctrl.addTo(map);
     return () => {
       ctrl.remove();
     };
-  }, [map]);
+  }, [map, statuses, mode]);
   return null;
 }
 
-function CleanAttribution() {
-  const map = useMap();
-  useEffect(() => {
-    map.attributionControl.setPrefix(false);
-  }, [map]);
-  return null;
-}
+// ─── Shared Popup Styles ────────────────────────────────────────────────────
 
-function LegendControl({
-  statuses,
-  projectName,
+const POP: React.CSSProperties = {
+  fontFamily: "system-ui",
+  fontSize: 12,
+  lineHeight: 1.55,
+  minWidth: 210,
+  padding: "10px 12px",
+};
+const LABEL_S: React.CSSProperties = {
+  fontWeight: 600,
+  color: "#1e293b",
+  marginRight: 4,
+};
+const META_S: React.CSSProperties = {
+  fontSize: 10,
+  color: "#94a3b8",
+  marginTop: 5,
+  paddingTop: 5,
+  borderTop: "1px solid #f1f5f9",
+};
+
+function PopupHead({
+  color,
+  title,
+  badge,
 }: {
-  statuses: WEAStatus[];
-  projectName: string;
+  color: string;
+  title: string;
+  badge: string;
 }) {
-  const map = useMap();
-  useEffect(() => {
-    const legend = new L.Control({ position: "bottomright" });
-    legend.onAdd = () => {
-      const div = L.DomUtil.create("div");
-      const g = statuses.filter((s) => s.ampel === "green").length;
-      const y = statuses.filter((s) => s.ampel === "yellow").length;
-      const r = statuses.filter((s) => s.ampel === "red").length;
-      div.innerHTML = `<div style="background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);padding:10px 14px;border-radius:8px;
-        box-shadow:0 2px 12px rgba(0,0,0,0.1);font-family:system-ui;font-size:10px;color:#475569;line-height:1.8;border:1px solid #e2e8f0;">
-        <div style="font-weight:700;font-size:11px;color:#1e293b;margin-bottom:4px;">${projectName}</div>
-        <div style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#059669;"></span>Secured (${g})</div>
-        <div style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#d97706;"></span>Negotiation (${y})</div>
-        <div style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#dc2626;"></span>Open (${r})</div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:3px;padding-top:3px;border-top:1px solid #f1f5f9;">
-          <span style="width:8px;height:2px;background:#6366f1;border-radius:1px;"></span>Cable Route
-        </div>
-      </div>`;
-      return div;
-    };
-    legend.addTo(map);
-    return () => {
-      legend.remove();
-    };
-  }, [map, statuses, projectName]);
-  return null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        paddingBottom: 6,
+        marginBottom: 6,
+        borderBottom: "1px solid #f1f5f9",
+      }}
+    >
+      <span
+        style={{
+          width: 9,
+          height: 9,
+          borderRadius: "50%",
+          background: color,
+          flexShrink: 0,
+          border: "1.5px solid #fff",
+          boxShadow: `0 0 0 1px ${color}40`,
+        }}
+      />
+      <strong style={{ fontSize: 13, color: "#0f172a" }}>{title}</strong>
+      <span
+        style={{
+          fontSize: 9,
+          fontWeight: 700,
+          padding: "1px 7px",
+          borderRadius: 4,
+          background: `${color}10`,
+          color,
+          marginLeft: "auto",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {badge}
+      </span>
+    </div>
+  );
 }
 
-// ─── Tile layer config ──────────────────────────────────────────────────────
+function PopupRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ fontSize: 11, color: "#475569", padding: "1px 0" }}>
+      <span style={LABEL_S}>{label}</span>
+      {value}
+    </div>
+  );
+}
+
+// ─── Tiles ──────────────────────────────────────────────────────────────────
 
 const TILES = {
   street: {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attr: "© OpenStreetMap",
+    a: "© OpenStreetMap",
   },
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attr: "© Esri",
+    a: "© Esri",
   },
   topo: {
     url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-    attr: "© OpenTopoMap",
+    a: "© OpenTopoMap",
   },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
+// COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface Props {
   statuses: WEAStatus[];
   infrastructure: InfraPoint[];
+  parcels?: CadastralParcel[];
   projectName: string;
   className?: string;
 }
@@ -201,19 +323,24 @@ interface Props {
 export default function ProjectLocationMap({
   statuses,
   infrastructure,
+  parcels = [],
   projectName,
   className,
 }: Props) {
-  const [mapActive, setMapActive] = useState(false);
+  const [active, setActive] = useState(false);
+  const [mode, setMode] = useState<ViewMode>("turbines");
 
-  const center: [number, number] = [
-    statuses.reduce((s, w) => s + w.lat, 0) / (statuses.length || 1),
-    statuses.reduce((s, w) => s + w.lng, 0) / (statuses.length || 1),
-  ];
+  const center: [number, number] = useMemo(
+    () => [
+      statuses.reduce((s, w) => s + w.lat, 0) / (statuses.length || 1),
+      statuses.reduce((s, w) => s + w.lng, 0) / (statuses.length || 1),
+    ],
+    [statuses],
+  );
 
   const cStart = infrastructure.find((p) => p.type === "cable_start");
   const cEnd = infrastructure.find((p) => p.type === "cable_end");
-  const cableRoute: [number, number][] =
+  const cable: [number, number][] =
     cStart && cEnd
       ? [
           [cStart.lat, cStart.lng],
@@ -221,13 +348,29 @@ export default function ProjectLocationMap({
         ]
       : [];
 
-  const counts = {
-    green: statuses.filter((s) => s.ampel === "green").length,
-    yellow: statuses.filter((s) => s.ampel === "yellow").length,
-    red: statuses.filter((s) => s.ampel === "red").length,
-  };
+  const allPts = useMemo<L.LatLngExpression[]>(
+    () => [
+      ...statuses.map((w) => [w.lat, w.lng] as L.LatLngExpression),
+      ...infrastructure.map((p) => [p.lat, p.lng] as L.LatLngExpression),
+      ...(mode === "parcels"
+        ? parcels.flatMap((p) => p.polygon as L.LatLngExpression[])
+        : []),
+    ],
+    [statuses, infrastructure, parcels, mode],
+  );
 
-  const handleMouseLeave = useCallback(() => setMapActive(false), []);
+  const parcelStats = useMemo(() => {
+    const total = parcels.reduce((s, p) => s + p.area, 0);
+    const secured = parcels
+      .filter((p) => ["secured", "buffer", "easement"].includes(p.status))
+      .reduce((s, p) => s + p.area, 0);
+    return {
+      count: parcels.length,
+      total,
+      secured,
+      pct: total > 0 ? Math.round((secured / total) * 100) : 0,
+    };
+  }, [parcels]);
 
   return (
     <div
@@ -237,258 +380,374 @@ export default function ProjectLocationMap({
       )}
     >
       {/* ── Header ── */}
-      <div className="bg-slate-50 dark:bg-slate-800/60 px-4 py-2 border-b border-border/40 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">Project Location Map</span>
-          <span className="text-[9px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted font-medium uppercase tracking-wide">
-            Interactive
-          </span>
-        </div>
-        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            {counts.green}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-amber-500" />
-            {counts.yellow}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-rose-500" />
-            {counts.red}
-          </span>
-          <span className="text-muted-foreground/40">|</span>
-          <span>{statuses.length} WEA</span>
-        </div>
+      <div className="bg-muted/30 dark:bg-muted/10 px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold truncate">{projectName}</h4>
+
+        {/* View toggle */}
+        {parcels.length > 0 && (
+          <div className="flex items-center bg-muted/50 dark:bg-muted/30 rounded-md p-0.5 border border-border/40">
+            <button
+              onClick={() => setMode("turbines")}
+              className={cn(
+                "text-[10px] font-medium px-3 py-1 rounded-[5px] transition-all",
+                mode === "turbines"
+                  ? "bg-background dark:bg-muted text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Turbines
+            </button>
+            <button
+              onClick={() => setMode("parcels")}
+              className={cn(
+                "text-[10px] font-medium px-3 py-1 rounded-[5px] transition-all",
+                mode === "parcels"
+                  ? "bg-background dark:bg-muted text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Parcels
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Map ── */}
       <div
         className="relative"
-        onClick={() => setMapActive(true)}
-        onMouseLeave={handleMouseLeave}
+        onClick={() => setActive(true)}
+        onMouseLeave={() => setActive(false)}
       >
-        {/* Leaflet style overrides — scoped via nesting */}
         <style>{`
-          .plm-container .leaflet-control-attribution { font-size: 9px; opacity: 0.6; }
-          .plm-container .leaflet-control-attribution a { color: #64748b; }
-          .plm-container .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
-          .plm-container .leaflet-popup-content { margin: 10px 12px; }
-          .plm-container .leaflet-popup-close-button { font-size: 16px; color: #94a3b8; padding: 6px 8px 0 0; }
-          .plm-container .leaflet-control-layers { border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-          .plm-container .leaflet-control-layers-toggle { width: 32px; height: 32px; background-size: 18px; }
-          .plm-container .leaflet-control-zoom a { width: 30px; height: 30px; line-height: 30px; font-size: 14px; color: #475569; }
-          .plm-container .leaflet-control-zoom { border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-          .plm-container .wea-label-tooltip { background: transparent; border: none; box-shadow: none; font-size: 9px; font-weight: 700; color: #1e293b; padding: 0; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 6px #fff; }
-          .plm-container .wea-label-tooltip::before { display: none; }
+          .plm .leaflet-control-attribution{font-size:9px;opacity:0.35;transition:opacity .2s}
+          .plm .leaflet-control-attribution:hover{opacity:0.8}
+          .plm .leaflet-control-attribution a{color:#64748b!important}
+          .plm .leaflet-popup-content-wrapper{border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.1);border:1px solid #e2e8f0}
+          .plm .leaflet-popup-content{margin:0;padding:0}
+          .plm .leaflet-popup-close-button{font-size:18px;color:#cbd5e1;top:6px;right:8px;width:20px;height:20px}
+          .plm .leaflet-popup-close-button:hover{color:#64748b}
+          .plm .leaflet-popup-tip{border-top-color:#fff;box-shadow:0 2px 4px rgba(0,0,0,.06)}
+          .plm .leaflet-control-layers{border-radius:8px;border:1px solid #e2e8f0;box-shadow:0 1px 8px rgba(0,0,0,.06);overflow:hidden}
+          .plm .leaflet-control-layers-toggle{width:30px;height:30px;background-size:16px}
+          .plm .leaflet-control-zoom{border-radius:8px;border:1px solid #e2e8f0;box-shadow:0 1px 8px rgba(0,0,0,.06);overflow:hidden}
+          .plm .leaflet-control-zoom a{width:30px;height:30px;line-height:30px;font-size:14px;color:#475569}
+          .plm .leaflet-control-zoom a:hover{background:#f8fafc}
+          .plm .plm-wea-label{background:none!important;border:none!important;box-shadow:none!important;
+            font:700 9.5px/1 system-ui;color:#0f172a;padding:0!important;
+            text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 8px #fff}
+          .plm .plm-wea-label::before{display:none}
         `}</style>
 
-        <div className="plm-container">
+        <div className="plm">
           <MapContainer
             center={center}
             zoom={14}
             scrollWheelZoom={false}
             zoomControl={false}
-            style={{ height: "420px", width: "100%" }}
+            style={{ height: "460px", width: "100%" }}
           >
-            <CleanAttribution />
-            <ScrollZoomController active={mapActive} />
-            <FitBounds statuses={statuses} infra={infrastructure} />
-            <LegendControl statuses={statuses} projectName={projectName} />
-            <ZoomControl />
+            <SetupControls />
+            <ScrollControl on={active} />
+            <FitBounds points={allPts} />
+            <MapLegend statuses={statuses} mode={mode} />
 
-            <LayersControl position="topright" collapsed={true}>
+            <LayersControl position="topright" collapsed>
               <LayersControl.BaseLayer checked name="Street">
                 <TileLayer
                   url={TILES.street.url}
-                  attribution={TILES.street.attr}
+                  attribution={TILES.street.a}
                   maxZoom={19}
                 />
               </LayersControl.BaseLayer>
               <LayersControl.BaseLayer name="Satellite">
                 <TileLayer
                   url={TILES.satellite.url}
-                  attribution={TILES.satellite.attr}
+                  attribution={TILES.satellite.a}
                   maxZoom={18}
                 />
               </LayersControl.BaseLayer>
               <LayersControl.BaseLayer name="Topographic">
                 <TileLayer
                   url={TILES.topo.url}
-                  attribution={TILES.topo.attr}
+                  attribution={TILES.topo.a}
                   maxZoom={17}
                 />
               </LayersControl.BaseLayer>
             </LayersControl>
 
-            {/* Cable route */}
-            {cableRoute.length === 2 && (
+            {/* ═══ SHARED: Cable Route + Infrastructure (both views) ═══ */}
+
+            {cable.length === 2 && (
               <Polyline
-                positions={cableRoute}
+                positions={cable}
                 pathOptions={{
                   color: "#6366f1",
-                  weight: 3,
+                  weight: 2.5,
                   dashArray: "10 6",
-                  opacity: 0.75,
+                  opacity: 0.7,
                 }}
               >
                 <Popup>
-                  <div style={{ fontFamily: "system-ui", fontSize: "12px" }}>
+                  <div style={POP}>
                     <strong>Cable Route</strong>
-                    <br />
-                    <span style={{ color: "#64748b" }}>
+                    <div
+                      style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}
+                    >
                       4.2 km → Substation Tostedt
-                    </span>
+                    </div>
                   </div>
                 </Popup>
               </Polyline>
             )}
 
-            {/* Infrastructure */}
             {infrastructure
               .filter((p) => p.type !== "cable_start")
               .map((p) => (
                 <Marker
                   key={p.name}
                   position={[p.lat, p.lng]}
-                  icon={createInfraIcon(p.type)}
+                  icon={infraIcon(p.type)}
                 >
                   <Popup>
-                    <div style={{ fontFamily: "system-ui", fontSize: "12px" }}>
+                    <div style={POP}>
                       <strong>{p.name}</strong>
-                      <br />
-                      <span style={{ color: "#94a3b8", fontSize: "11px" }}>
+                      <div style={META_S}>
                         {p.lat.toFixed(5)}°N, {p.lng.toFixed(5)}°E
-                      </span>
+                      </div>
                     </div>
                   </Popup>
                 </Marker>
               ))}
 
-            {/* WEA turbines */}
-            {statuses.map((w) => (
-              <Marker
-                key={w.name}
-                position={[w.lat, w.lng]}
-                icon={createWEAIcon(w.ampel, w.name.replace("WEA ", "T"))}
-              >
-                <Popup>
-                  <div
-                    style={{
-                      fontFamily: "system-ui",
-                      fontSize: "12px",
-                      minWidth: "200px",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        paddingBottom: "6px",
-                        marginBottom: "6px",
-                        borderBottom: "1px solid #f1f5f9",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          background: AMPEL_HEX[w.ampel],
-                          flexShrink: 0,
-                        }}
+            {/* ═══ TURBINES VIEW ═══ */}
+
+            {mode === "turbines" &&
+              statuses.map((w) => (
+                <Marker
+                  key={w.name}
+                  position={[w.lat, w.lng]}
+                  icon={weaIcon(w.ampel, w.name.replace("WEA ", ""))}
+                >
+                  <Popup>
+                    <div style={POP}>
+                      <PopupHead
+                        color={AMPEL[w.ampel].hex}
+                        title={w.name}
+                        badge={AMPEL[w.ampel].label}
                       />
-                      <strong style={{ fontSize: "13px" }}>{w.name}</strong>
-                      <span
-                        style={{
-                          fontSize: "9px",
-                          fontWeight: 700,
-                          padding: "1px 6px",
-                          borderRadius: "3px",
-                          background: `${AMPEL_HEX[w.ampel]}15`,
-                          color: AMPEL_HEX[w.ampel],
+                      <PopupRow label="Owner" value={w.owner} />
+                      <PopupRow label="Parcel" value={w.parcel} />
+                      <PopupRow label="Address" value={w.address} />
+                      <PopupRow label="Contract" value={w.contract} />
+                      <div style={META_S}>
+                        {w.lat.toFixed(5)}°N, {w.lng.toFixed(5)}°E
+                      </div>
+                    </div>
+                  </Popup>
+                  <LeafletTooltip
+                    direction="top"
+                    offset={[0, -17]}
+                    permanent
+                    className="plm-wea-label"
+                  >
+                    {w.name}
+                  </LeafletTooltip>
+                </Marker>
+              ))}
+
+            {/* ═══ PARCELS VIEW ═══ */}
+
+            {mode === "parcels" && (
+              <>
+                {/* Parcel polygons + corner labels */}
+                {parcels.map((parcel) => {
+                  const ps = PARCEL_STYLE[parcel.status];
+                  const isEasement = parcel.status === "easement";
+                  const labelPos = topLeftCorner(parcel.polygon);
+                  return (
+                    <span key={parcel.id}>
+                      <Polygon
+                        positions={parcel.polygon}
+                        pathOptions={{
+                          fillColor: ps.color,
+                          fillOpacity: 0.2,
+                          color: ps.color,
+                          weight: isEasement ? 1.5 : 2.5,
+                          dashArray: isEasement ? "6 4" : undefined,
+                          opacity: 0.9,
                         }}
                       >
-                        {AMPEL_LABEL[w.ampel]}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#475569" }}>
-                      <div>
-                        <b style={{ color: "#1e293b" }}>Owner:</b> {w.owner}
-                      </div>
-                      <div>
-                        <b style={{ color: "#1e293b" }}>Parcel:</b> {w.parcel}
-                      </div>
-                      <div>
-                        <b style={{ color: "#1e293b" }}>Address:</b> {w.address}
-                      </div>
-                      <div>
-                        <b style={{ color: "#1e293b" }}>Contract:</b>{" "}
-                        {w.contract}
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        marginTop: "5px",
-                        paddingTop: "5px",
-                        borderTop: "1px solid #f1f5f9",
-                        fontSize: "10px",
-                        color: "#94a3b8",
-                      }}
-                    >
-                      {w.lat.toFixed(5)}°N, {w.lng.toFixed(5)}°E
-                    </div>
-                  </div>
-                </Popup>
-                <LeafletTooltip
-                  direction="top"
-                  offset={[0, -16]}
-                  permanent
-                  className="wea-label-tooltip"
-                >
-                  {w.name}
-                </LeafletTooltip>
-              </Marker>
-            ))}
+                        <Popup>
+                          <div style={POP}>
+                            <PopupHead
+                              color={ps.color}
+                              title={`Flst. ${parcel.parcelNumber}`}
+                              badge={ps.label}
+                            />
+                            <PopupRow
+                              label="Gemarkung"
+                              value={`${parcel.gemarkung}, Flur ${parcel.flur}`}
+                            />
+                            <PopupRow label="Owner" value={parcel.owner} />
+                            <PopupRow
+                              label="Area"
+                              value={`${parcel.area} ha`}
+                            />
+                            {parcel.linkedWEA && (
+                              <PopupRow
+                                label="Turbine"
+                                value={parcel.linkedWEA}
+                              />
+                            )}
+                            {parcel.contractRef && (
+                              <PopupRow
+                                label="Contract"
+                                value={parcel.contractRef}
+                              />
+                            )}
+                            {parcel.notes && (
+                              <div style={{ ...META_S, fontStyle: "italic" }}>
+                                {parcel.notes}
+                              </div>
+                            )}
+                          </div>
+                        </Popup>
+                      </Polygon>
+                      <Marker
+                        position={labelPos}
+                        icon={parcelLabelIcon(parcel.parcelNumber, ps.color)}
+                        interactive={false}
+                      />
+                    </span>
+                  );
+                })}
+
+                {/* Small WEA reference dots (position only, no labels) */}
+                {statuses.map((w) => (
+                  <Marker
+                    key={`dot-${w.name}`}
+                    position={[w.lat, w.lng]}
+                    icon={weaDotIcon(w.ampel)}
+                  >
+                    <LeafletTooltip direction="top" offset={[0, -8]}>
+                      {w.name}
+                    </LeafletTooltip>
+                  </Marker>
+                ))}
+              </>
+            )}
           </MapContainer>
         </div>
 
-        {/* "Click to interact" overlay */}
-        {!mapActive && (
-          <div className="absolute inset-0 z-[1000] flex items-end justify-center pb-4 pointer-events-none">
-            <div className="bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium px-3 py-1.5 rounded-full shadow-lg animate-pulse">
-              Click to enable zoom & pan
+        {/* Scroll hint */}
+        {!active && (
+          <div className="absolute inset-0 z-[1000] flex items-end justify-center pb-3.5 pointer-events-none">
+            <div className="bg-foreground/55 text-background text-[10px] font-medium px-3 py-1 rounded-full backdrop-blur-sm">
+              Click map to zoom & pan
             </div>
           </div>
         )}
       </div>
 
-      {/* ── Coordinates ── */}
-      <div className="border-t border-border/40">
-        <div className="px-4 py-2 bg-slate-50/50 dark:bg-slate-800/30">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-            Coordinates
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1">
-            {statuses.map((w) => (
-              <div
-                key={w.name}
-                className="flex items-center gap-1.5 text-[11px]"
-              >
-                <span
-                  className={cn("w-1.5 h-1.5 rounded-full", AMPEL_BG[w.ampel])}
-                />
-                <span className="font-medium">{w.name}</span>
-                <span className="text-muted-foreground">
-                  {w.lat.toFixed(4)}°, {w.lng.toFixed(4)}°
-                </span>
-              </div>
-            ))}
+      {/* ── Bottom Panel: contextual to active view ── */}
+
+      {mode === "turbines" && (
+        <div className="border-t border-border/40 bg-muted/10">
+          <div className="px-4 py-2">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+              WEA Coordinates
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-0.5">
+              {statuses.map((w) => (
+                <div
+                  key={w.name}
+                  className="flex items-center gap-1.5 text-[10.5px] py-0.5"
+                >
+                  <span
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                      AMPEL[w.ampel].tw,
+                    )}
+                  />
+                  <span className="font-semibold">{w.name}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {w.lat.toFixed(4)}, {w.lng.toFixed(4)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {mode === "parcels" && parcels.length > 0 && (
+        <div className="border-t border-border/40 bg-muted/10">
+          <div className="px-4 py-2.5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Cadastral Parcels
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {parcelStats.count} parcels · {parcelStats.total.toFixed(1)} ha
+                ·{" "}
+                <span
+                  className={
+                    parcelStats.pct >= 80
+                      ? "text-emerald-600"
+                      : parcelStats.pct >= 50
+                        ? "text-amber-600"
+                        : "text-rose-600"
+                  }
+                >
+                  {parcelStats.pct}% secured
+                </span>
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5">
+              {parcels.map((p) => {
+                const ps = PARCEL_STYLE[p.status];
+                return (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-2 py-1 text-[11px] border-b border-border/20 last:border-0"
+                  >
+                    <span
+                      style={{
+                        width: 12,
+                        height: 7,
+                        borderRadius: 2,
+                        background: `${ps.color}20`,
+                        border: `1.5px solid ${ps.color}`,
+                      }}
+                      className="flex-shrink-0"
+                    />
+                    <span className="font-semibold min-w-[48px]">
+                      {p.parcelNumber}
+                    </span>
+                    <span className="text-muted-foreground truncate flex-1">
+                      {p.owner}
+                    </span>
+                    <span className="text-muted-foreground/60 text-[10px]">
+                      {p.area}ha
+                    </span>
+                    {p.linkedWEA && (
+                      <span className="text-[10px] text-muted-foreground/50">
+                        →{p.linkedWEA}
+                      </span>
+                    )}
+                    <span
+                      style={{ color: ps.color }}
+                      className="text-[9px] font-semibold min-w-[72px] text-right"
+                    >
+                      {ps.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

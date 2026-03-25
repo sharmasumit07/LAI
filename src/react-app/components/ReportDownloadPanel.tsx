@@ -35,6 +35,8 @@ import {
   type AusgabeblattSection,
   type WEAStatus,
   type DocumentItem,
+  type CadastralParcel,
+  type ParcelStatus,
   type ReportPreset,
   type ExportFormat,
 } from "@/react-app/lib/ddiqDemoData";
@@ -209,6 +211,98 @@ const FindingsTable = ({
   </div>
 );
 
+// ── Cadastral Parcel Table (preview) ────────────────────────────────────────
+
+const CadastralTable = ({ parcels }: { parcels: CadastralParcel[] }) => {
+  const byStatus = {
+    secured: parcels.filter((p) => p.status === "secured"),
+    negotiation: parcels.filter((p) => p.status === "negotiation"),
+    open: parcels.filter((p) => p.status === "open"),
+    buffer: parcels.filter((p) => p.status === "buffer"),
+    easement: parcels.filter((p) => p.status === "easement"),
+  };
+  const totalArea = parcels.reduce((s, p) => s + p.area, 0);
+  const securedArea = parcels
+    .filter(
+      (p) =>
+        p.status === "secured" ||
+        p.status === "buffer" ||
+        p.status === "easement",
+    )
+    .reduce((s, p) => s + p.area, 0);
+
+  return (
+    <div className="rounded-lg border border-border/60 overflow-hidden">
+      <div className="bg-slate-50 dark:bg-slate-800/60 px-4 py-2.5 border-b border-border/40 flex items-center justify-between">
+        <h4 className="text-sm font-semibold">
+          Cadastral Parcels (Flurstücke)
+        </h4>
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          <span>{parcels.length} parcels</span>
+          <span>{totalArea.toFixed(1)} ha total</span>
+          <span>{((securedArea / totalArea) * 100).toFixed(0)}% secured</span>
+        </div>
+      </div>
+      <div className="divide-y divide-border/30">
+        {parcels.map((p) => {
+          const pc = PARCEL_STATUS_COLORS[p.status];
+          return (
+            <div
+              key={p.id}
+              className="flex items-start gap-3 px-4 py-2.5 text-sm"
+            >
+              <span
+                style={{
+                  width: 14,
+                  height: 10,
+                  borderRadius: 2,
+                  background: pc.fill,
+                  border: `1.5px solid ${pc.stroke}`,
+                  flexShrink: 0,
+                  marginTop: 4,
+                }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold">Flst. {p.parcelNumber}</span>
+                  <span className="text-xs text-muted-foreground">
+                    Gemarkung {p.gemarkung}, Flur {p.flur}
+                  </span>
+                  <span
+                    style={{ color: pc.stroke, background: `${pc.stroke}10` }}
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                  >
+                    {pc.label}
+                  </span>
+                  {p.linkedWEA && (
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      {p.linkedWEA}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                  <span>{p.owner}</span>
+                  <span>{p.area} ha</span>
+                  {p.contractRef && (
+                    <span className="text-emerald-600 dark:text-emerald-500">
+                      {p.contractRef}
+                    </span>
+                  )}
+                </div>
+                {p.notes && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 italic">
+                    {p.notes}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOCATION MAP — Uses ProjectLocationMap (react-leaflet) for preview,
 //                static SVG for downloaded exports
@@ -225,6 +319,17 @@ const AMPEL_LABEL: Record<Ampel, string> = {
   green: "Secured",
   yellow: "Partial",
   red: "Open",
+};
+
+const PARCEL_STATUS_COLORS: Record<
+  ParcelStatus,
+  { fill: string; stroke: string; label: string }
+> = {
+  secured: { fill: "#05966930", stroke: "#059669", label: "Secured" },
+  negotiation: { fill: "#d9770630", stroke: "#d97706", label: "Negotiation" },
+  open: { fill: "#dc262630", stroke: "#dc2626", label: "Open" },
+  buffer: { fill: "#3b82f620", stroke: "#3b82f6", label: "Buffer Zone" },
+  easement: { fill: "#6366f118", stroke: "#6366f1", label: "Easement" },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -279,6 +384,42 @@ function generateHTML(d: DDiQReportData, a: string[]): string {
         .join("") +
       `</tbody></table>`
     : "";
+
+  // ── Cadastral Parcels table for export ──
+  const PC: Record<string, { stroke: string; label: string }> = {
+    secured: { stroke: "#059669", label: "Secured" },
+    negotiation: { stroke: "#d97706", label: "Negotiation" },
+    open: { stroke: "#dc2626", label: "Open" },
+    buffer: { stroke: "#3b82f6", label: "Buffer Zone" },
+    easement: { stroke: "#6366f1", label: "Easement" },
+  };
+  const cadastH =
+    a.includes("cadastralmap") && d.parcels.length > 0
+      ? `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">Cadastral Parcels (Flurstücke)</h2>` +
+        `<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f8fafc;">` +
+        `<th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Flurstück</th>` +
+        `<th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Gemarkung</th>` +
+        `<th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Owner</th>` +
+        `<th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Area</th>` +
+        `<th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">WEA</th>` +
+        `<th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Contract</th>` +
+        `<th style="text-align:left;padding:6px 10px;border:1px solid #e2e8f0;">Status</th></tr></thead><tbody>` +
+        d.parcels
+          .map((p) => {
+            const pc = PC[p.status] || { stroke: "#64748b", label: p.status };
+            return (
+              `<tr><td style="padding:6px 10px;border:1px solid #e2e8f0;font-weight:600;">${p.parcelNumber}</td>` +
+              `<td style="padding:6px 10px;border:1px solid #e2e8f0;">${p.gemarkung}, Flur ${p.flur}</td>` +
+              `<td style="padding:6px 10px;border:1px solid #e2e8f0;">${p.owner}</td>` +
+              `<td style="padding:6px 10px;border:1px solid #e2e8f0;">${p.area} ha</td>` +
+              `<td style="padding:6px 10px;border:1px solid #e2e8f0;">${p.linkedWEA || "—"}</td>` +
+              `<td style="padding:6px 10px;border:1px solid #e2e8f0;">${p.contractRef || "—"}</td>` +
+              `<td style="padding:6px 10px;border:1px solid #e2e8f0;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${pc.stroke};margin-right:4px;vertical-align:middle;"></span>${pc.label}</td></tr>`
+            );
+          })
+          .join("") +
+        `</tbody></table>`
+      : "";
 
   // ── Location Map: full interactive Leaflet for HTML export ──
   const hasLocMap = a.includes("locationmap");
@@ -416,7 +557,7 @@ function generateHTML(d: DDiQReportData, a: string[]): string {
     `<p style="font-size:18px;font-weight:600;color:#475569;margin:4px 0 0;">${d.projectName}</p>` +
     `<div style="display:flex;gap:24px;margin-top:12px;font-size:12px;color:#64748b;">` +
     `<span>Prepared for: ${d.preparedFor}</span><span>By: ${d.preparedBy}</span><span>Date: ${d.date}</span></div></div>` +
-    `${docList}${secH}${mapH}${locH}${findH}` +
+    `${docList}${secH}${mapH}${cadastH}${locH}${findH}` +
     `<div style="margin-top:40px;padding-top:16px;border-top:2px solid #e2e8f0;font-size:11px;color:#94a3b8;">Auto-generated by LAI · DDiQ v1. Does not substitute legal review.</div>` +
     `</body></html>`
   );
@@ -443,6 +584,12 @@ function generateCSV(d: DDiQReportData, a: string[]): string {
     d.weaStatuses.forEach((w) =>
       l.push(
         `"Location Map","${w.name}","${w.address}","${w.ampel}","${w.lat}","${w.lng}"`,
+      ),
+    );
+  if (a.includes("cadastralmap"))
+    d.parcels.forEach((p) =>
+      l.push(
+        `"Cadastral Parcel","Flst. ${p.parcelNumber}","${p.gemarkung} Flur ${p.flur} | ${p.owner} | ${p.area} ha | ${p.contractRef || "No contract"}","${p.status}","",""`,
       ),
     );
   if (a.includes("findings"))
@@ -514,6 +661,38 @@ function generateTXT(d: DDiQReportData, a: string[]): string {
       l.push(
         `  ${p.name.padEnd(28)} ${p.lat.toFixed(4)}°N, ${p.lng.toFixed(4)}°E`,
       ),
+    );
+  }
+  if (a.includes("cadastralmap") && d.parcels.length > 0) {
+    const statusLabel: Record<string, string> = {
+      secured: "SECURED",
+      negotiation: "NEGOTIATION",
+      open: "OPEN",
+      buffer: "BUFFER",
+      easement: "EASEMENT",
+    };
+    l.push(
+      "",
+      "--- CADASTRAL PARCELS (FLURSTÜCKE) ────────────────────────────────",
+      "",
+    );
+    d.parcels.forEach((p) => {
+      l.push(
+        `  [${(statusLabel[p.status] || p.status).padEnd(11)}] Flst. ${p.parcelNumber.padEnd(6)} | Gemarkung ${p.gemarkung}, Flur ${p.flur} | ${p.owner} | ${p.area} ha`,
+      );
+      if (p.linkedWEA)
+        l.push(
+          `  ${"".padEnd(16)} → ${p.linkedWEA}  Contract: ${p.contractRef || "None"}`,
+        );
+      if (p.notes) l.push(`  ${"".padEnd(16)} >> ${p.notes}`);
+    });
+    const totalArea = d.parcels.reduce((s, p) => s + p.area, 0);
+    const securedArea = d.parcels
+      .filter((p) => ["secured", "buffer", "easement"].includes(p.status))
+      .reduce((s, p) => s + p.area, 0);
+    l.push(
+      "",
+      `  Total: ${d.parcels.length} parcels, ${totalArea.toFixed(1)} ha, ${((securedArea / totalArea) * 100).toFixed(0)}% secured`,
     );
   }
   if (a.includes("findings")) {
@@ -1210,10 +1389,15 @@ export default function ReportDownloadPanel({
             {activeSections.includes("statusmap") && (
               <StatusMap statuses={rd.weaStatuses} />
             )}
+            {activeSections.includes("cadastralmap") &&
+              rd.parcels.length > 0 && <CadastralTable parcels={rd.parcels} />}
             {activeSections.includes("locationmap") && (
               <ProjectLocationMap
                 statuses={rd.weaStatuses}
                 infrastructure={rd.infrastructure}
+                parcels={
+                  activeSections.includes("cadastralmap") ? rd.parcels : []
+                }
                 projectName={rd.projectName}
               />
             )}
